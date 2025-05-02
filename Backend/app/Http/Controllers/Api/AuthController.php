@@ -12,28 +12,28 @@ class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        $request->validate([
+        $fields = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|unique:users',
-            'password' => 'required|string|min:6',
+            'password' => 'required|string|confirmed|min:6',
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => bcrypt($request->password),
-        ]);
+        $user = User::create($fields);
+        $token = $user->createToken($request->name);
 
-        return response()->json($user);
+        return response()->json([
+            'user' => $user,
+            'access_token' => $token->plainTextToken,
+        ]);
     }
 
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
+        $fields = $request->validate([
+            'email' => 'required|email|exists:users,email',
             'password' => 'required',
         ]);
-
+    
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
@@ -45,8 +45,9 @@ class AuthController extends Controller
         $token = $user->createToken('api-token')->plainTextToken;
 
         return response()->json([
-            'access_token' => $token,
-            'token_type' => 'Bearer',
+            'user' => $user,
+            'access_token' => $token
+            
         ]);
     }
 
