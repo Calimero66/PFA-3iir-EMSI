@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Commande;
+use App\Models\Order;
 use Illuminate\Http\Request;
 
-class CommandeController extends Controller
+class OrderController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -34,7 +34,7 @@ class CommandeController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Commande $commande)
+    public function show(Order $order)
     {
         //
     }
@@ -42,7 +42,7 @@ class CommandeController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Commande $commande)
+    public function edit(Order $order)
     {
         //
     }
@@ -50,7 +50,7 @@ class CommandeController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Commande $commande)
+    public function update(Request $request, Order $order)
     {
         //
     }
@@ -58,7 +58,7 @@ class CommandeController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Commande $commande)
+    public function destroy(Order $order)
     {
         //
     }

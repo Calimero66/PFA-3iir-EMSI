@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Categorie;
+use App\Models\StockMovement;
 use Illuminate\Http\Request;
 
-class CategorieController extends Controller
+class StockMovementController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -34,7 +34,7 @@ class CategorieController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Categorie $categorie)
+    public function show(StockMovement $stockMovement)
     {
         //
     }
@@ -42,7 +42,7 @@ class CategorieController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Categorie $categorie)
+    public function edit(StockMovement $stockMovement)
     {
         //
     }
@@ -50,7 +50,7 @@ class CategorieController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Categorie $categorie)
+    public function update(Request $request, StockMovement $stockMovement)
     {
         //
     }
@@ -58,7 +58,7 @@ class CategorieController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Categorie $categorie)
+    public function destroy(StockMovement $stockMovement)
     {
         //
     }

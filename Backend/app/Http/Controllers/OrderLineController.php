@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MouvementStock;
+use App\Models\OrderLine;
 use Illuminate\Http\Request;
 
-class MouvementStockController extends Controller
+class OrderLineController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -34,7 +34,7 @@ class MouvementStockController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(MouvementStock $mouvementStock)
+    public function show(OrderLine $orderLine)
     {
         //
     }
@@ -42,7 +42,7 @@ class MouvementStockController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(MouvementStock $mouvementStock)
+    public function edit(OrderLine $orderLine)
     {
         //
     }
@@ -50,7 +50,7 @@ class MouvementStockController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, MouvementStock $mouvementStock)
+    public function update(Request $request, OrderLine $orderLine)
     {
         //
     }
@@ -58,7 +58,7 @@ class MouvementStockController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(MouvementStock $mouvementStock)
+    public function destroy(OrderLine $orderLine)
     {
         //
     }

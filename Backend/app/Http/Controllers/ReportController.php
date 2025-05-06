@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Rapport;
+use App\Models\Report;
 use Illuminate\Http\Request;
 
-class RapportController extends Controller
+class ReportController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -34,7 +34,7 @@ class RapportController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Rapport $rapport)
+    public function show(Report $report)
     {
         //
     }
@@ -42,7 +42,7 @@ class RapportController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Rapport $rapport)
+    public function edit(Report $report)
     {
         //
     }
@@ -50,7 +50,7 @@ class RapportController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Rapport $rapport)
+    public function update(Request $request, Report $report)
     {
         //
     }
@@ -58,7 +58,7 @@ class RapportController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Rapport $rapport)
+    public function destroy(Report $report)
     {
         //
     }
