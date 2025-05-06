@@ -6,12 +6,19 @@ use App\Models\Article;
 use App\Models\StockMovement;
 use App\Models\StockSupply;
 use App\Models\Supplier;
+use App\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 
 class ArticleController extends Controller
 {
+    protected $stockService;
+
+    public function __construct(StockService $stockService)
+    {
+        $this->stockService = $stockService;
+    }
     /**
      * Display a listing of the resource.
      *
@@ -93,36 +100,68 @@ class ArticleController extends Controller
         ]);
 
         return DB::transaction(function () use ($request, $validated) {
-            // Create the article
+            // Check if article with this barcode already exists
+            $existingArticle = Article::where('barcode', $validated['barcode'])->first();
+
+            if ($existingArticle) {
+                // Article already exists, update its price if needed
+                if ($existingArticle->price != $validated['price']) {
+                    $existingArticle->price = $validated['price'];
+                    $existingArticle->save();
+                }
+
+                // If supplier_id is provided, add stock supply
+                if ($request->has('supplier_id') && $request->supplier_id !== null) {
+                    $stockSupply = $this->stockService->addSupply([
+                        'article_id' => $existingArticle->id,
+                        'supplier_id' => $request->supplier_id,
+                        'quantity' => $validated['quantity'],
+                        'supply_date' => now()
+                    ]);
+
+                    // Refresh the article to get the updated quantity
+                    $existingArticle->refresh();
+
+                    return response()->json([
+                        'message' => 'Article stock updated successfully',
+                        'article' => $existingArticle,
+                        'stock_supply' => $stockSupply
+                    ], 200);
+                }
+
+                return response()->json([
+                    'message' => 'Article already exists',
+                    'article' => $existingArticle
+                ], 200);
+            }
+
+            // Create a new article with quantity 0 initially
+            $initialQuantity = $validated['quantity'];
+            $validated['quantity'] = 0;
             $article = Article::create($validated);
 
             // If supplier_id is provided, create a stock supply record
-            if ($request->has('supplier_id')) {
-                $supplier = Supplier::findOrFail($request->supplier_id);
-
-                // Create stock supply record
-                $stockSupply = StockSupply::create([
+            $stockSupply = null;
+            if ($request->has('supplier_id') && $request->supplier_id !== null) {
+                $stockSupply = $this->stockService->addSupply([
                     'article_id' => $article->id,
-                    'supplier_id' => $supplier->id,
-                    'quantity' => $validated['quantity'],
-                    'supply_date' => now(),
-                    // 'notes' => $request->input('notes', 'Initial stock supply')
+                    'supplier_id' => $request->supplier_id,
+                    'quantity' => $initialQuantity,
+                    'supply_date' => now()
                 ]);
 
-                // Create stock movement record
-                StockMovement::create([
-                    'article_id' => $article->id,
-                    'type' => 'in',
-                    'quantity' => $validated['quantity'],
-                    'date' => now(),
-                    'reason' => 'Initial supply from ' . $supplier->name
-                ]);
+                // Refresh the article to get the updated quantity
+                $article->refresh();
+            } else {
+                // If no supplier_id, just set the quantity directly
+                $article->quantity = $initialQuantity;
+                $article->save();
             }
 
             return response()->json([
                 'message' => 'Article created successfully',
                 'article' => $article,
-                'stock_supply' => $request->has('supplier_id') ? $stockSupply : null
+                'stock_supply' => $stockSupply
             ], 201);
         });
     }
@@ -137,18 +176,6 @@ class ArticleController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * Note: This method is not typically used in API controllers
-     * but is included for completeness.
-     */
-    public function edit(Article $article)
-    {
-        return response()->json([
-            'message' => 'Form editing is not supported in API mode'
-        ], 405);
-    }
 
     /**
      * Update the specified resource in storage.

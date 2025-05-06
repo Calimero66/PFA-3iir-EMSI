@@ -25,8 +25,7 @@ class StockService
                 'article_id' => $data['article_id'],
                 'supplier_id' => $data['supplier_id'],
                 'quantity' => $data['quantity'],
-                'supply_date' => $data['supply_date'] ?? now(),
-                'notes' => $data['notes'] ?? null,
+                'supply_date' => $data['supply_date'] ?? now()
             ]);
 
             // Update the article quantity
