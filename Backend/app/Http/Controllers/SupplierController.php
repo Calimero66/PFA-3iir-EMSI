@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Supplier;
 use App\Models\Article;
-use App\Models\StockSupply;
+
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -125,15 +125,7 @@ class SupplierController extends Controller
             ], 409); // Conflict status code
         }
 
-        // Check if the supplier has any associated stock supplies
-        $stockSuppliesCount = StockSupply::where('supplier_id', $supplier->id)->count();
 
-        if ($stockSuppliesCount > 0) {
-            return response()->json([
-                'message' => 'Cannot delete supplier because it has associated stock supplies',
-                'stock_supplies_count' => $stockSuppliesCount
-            ], 409); // Conflict status code
-        }
 
         $supplier->delete();
 
@@ -187,41 +179,7 @@ class SupplierController extends Controller
         ]);
     }
 
-    /**
-     * Get all stock supplies from a specific supplier.
-     *
-     * @param  \App\Models\Supplier  $supplier
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function getStockSupplies(Supplier $supplier, Request $request)
-    {
-        $query = StockSupply::with('article')
-            ->where('supplier_id', $supplier->id);
 
-        // Sort by field
-        if ($request->has('sort_by')) {
-            $sortDirection = $request->get('sort_direction', 'asc');
-            $query->orderBy($request->sort_by, $sortDirection);
-        } else {
-            $query->orderBy('supply_date', 'desc');
-        }
-
-        // Filter by date range
-        if ($request->has('start_date') && $request->has('end_date')) {
-            $query->whereBetween('supply_date', [$request->start_date, $request->end_date]);
-        }
-
-        $stockSupplies = $query->get();
-        $totalQuantity = $stockSupplies->sum('quantity');
-
-        return response()->json([
-            'supplier' => $supplier,
-            'stock_supplies' => $stockSupplies,
-            'total_count' => $stockSupplies->count(),
-            'total_quantity' => $totalQuantity
-        ]);
-    }
 
     /**
      * Get suppliers with article counts.
@@ -230,7 +188,7 @@ class SupplierController extends Controller
      */
     public function getSuppliersWithCounts()
     {
-        $suppliers = Supplier::withCount(['articles', 'stockSupplies'])
+        $suppliers = Supplier::withCount('articles')
             ->orderBy('name', 'asc')
             ->get();
 

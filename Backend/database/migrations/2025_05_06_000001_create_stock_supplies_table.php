@@ -14,10 +14,11 @@ return new class extends Migration
         Schema::create('stock_supplies', function (Blueprint $table) {
             $table->id();
             $table->foreignId('article_id')->constrained('articles', 'id')->onDelete('cascade');
-            $table->foreignId('supplier_id')->constrained('suppliers', 'id')->onDelete('cascade');
+            // $table->foreignId('category_id')->nullable()->constrained('categories', 'id')->onDelete('set null');
+            // $table->foreignId('supplier_id')->nullable()->constrained('suppliers', 'id')->onDelete('set null');
             $table->integer('quantity');
             $table->dateTime('supply_date');
-            // $table->text('notes')->nullable();
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }

@@ -97,6 +97,7 @@ class ArticleController extends Controller
             'quantity' => 'required|integer|min:0',
             'category_id' => 'nullable|exists:categories,id',
             'supplier_id' => 'nullable|exists:suppliers,id',
+            'notes' => 'nullable|string',
         ]);
 
         return DB::transaction(function () use ($request, $validated) {
@@ -104,59 +105,39 @@ class ArticleController extends Controller
             $existingArticle = Article::where('barcode', $validated['barcode'])->first();
 
             if ($existingArticle) {
-                // Article already exists, update its price if needed
-                if ($existingArticle->price != $validated['price']) {
-                    $existingArticle->price = $validated['price'];
-                    $existingArticle->save();
-                }
-
-                // If supplier_id is provided, add stock supply
-                if ($request->has('supplier_id') && $request->supplier_id !== null) {
-                    $stockSupply = $this->stockService->addSupply([
-                        'article_id' => $existingArticle->id,
-                        'supplier_id' => $request->supplier_id,
-                        'quantity' => $validated['quantity'],
-                        'supply_date' => now()
-                    ]);
-
-                    // Refresh the article to get the updated quantity
-                    $existingArticle->refresh();
-
+                // If the article exists but with a different category_id, return an error
+                if (isset($validated['category_id']) && $existingArticle->category_id != $validated['category_id']) {
                     return response()->json([
-                        'message' => 'Article stock updated successfully',
-                        'article' => $existingArticle,
-                        'stock_supply' => $stockSupply
-                    ], 200);
+                        'message' => 'An article with this barcode already exists in a different category',
+                        'existing_article' => $existingArticle
+                    ], 422);
                 }
 
-                return response()->json([
-                    'message' => 'Article already exists',
-                    'article' => $existingArticle
-                ], 200);
+                // If the article has the same barcode and same category, allow creating a new article
+                // Continue with the creation process
             }
 
-            // Create a new article with quantity 0 initially
-            $initialQuantity = $validated['quantity'];
-            $validated['quantity'] = 0;
+            // Create a new article
             $article = Article::create($validated);
 
-            // If supplier_id is provided, create a stock supply record
-            $stockSupply = null;
-            if ($request->has('supplier_id') && $request->supplier_id !== null) {
-                $stockSupply = $this->stockService->addSupply([
-                    'article_id' => $article->id,
-                    'supplier_id' => $request->supplier_id,
-                    'quantity' => $initialQuantity,
-                    'supply_date' => now()
-                ]);
+            // Prepare supply data
+            $supplyData = [
+                'article_id' => $article->id,
+                'quantity' => $validated['quantity'],
+                'supply_date' => now(),
+                'update_existing' => true // Flag to update existing stock supply by barcode
+            ];
 
-                // Refresh the article to get the updated quantity
-                $article->refresh();
-            } else {
-                // If no supplier_id, just set the quantity directly
-                $article->quantity = $initialQuantity;
-                $article->save();
+            // Add notes if provided
+            if ($request->has('notes')) {
+                $supplyData['notes'] = $request->notes;
             }
+
+            // Create stock supply using the stock service
+            $stockSupply = $this->stockService->addSupply($supplyData);
+
+            // Refresh article to get updated quantity
+            $article->refresh();
 
             return response()->json([
                 'message' => 'Article created successfully',
@@ -164,6 +145,7 @@ class ArticleController extends Controller
                 'stock_supply' => $stockSupply
             ], 201);
         });
+
     }
 
     /**
@@ -183,13 +165,30 @@ class ArticleController extends Controller
     public function update(Request $request, Article $article)
     {
         $validated = $request->validate([
-            'barcode' => 'sometimes|required|string|max:12|unique:articles,barcode,' . $article->id,
+            'barcode' => "sometimes|required|string|max:12",
             'name' => 'sometimes|required|string|max:255',
             'price' => 'sometimes|required|numeric|min:0',
             'quantity' => 'sometimes|required|integer|min:0',
             'category_id' => 'sometimes|nullable|exists:categories,id',
             'supplier_id' => 'sometimes|nullable|exists:suppliers,id',
+            'notes' => 'nullable|string',
         ]);
+
+        // If barcode is being changed, check if it already exists with a different category
+        if (isset($validated['barcode']) && $validated['barcode'] !== $article->barcode) {
+            $existingArticle = Article::where('barcode', $validated['barcode'])->first();
+
+            if ($existingArticle) {
+                $newCategoryId = $validated['category_id'] ?? $article->category_id;
+
+                if ($existingArticle->category_id != $newCategoryId) {
+                    return response()->json([
+                        'message' => 'An article with this barcode already exists in a different category',
+                        'existing_article' => $existingArticle
+                    ], 422);
+                }
+            }
+        }
 
         $article->update($validated);
 
@@ -211,3 +210,4 @@ class ArticleController extends Controller
         ]);
     }
 }
+

@@ -11,7 +11,6 @@ class StockSupply extends Model
 
     protected $fillable = [
         'article_id',
-        'supplier_id',
         'quantity',
         'supply_date',
         'notes'
@@ -26,8 +25,6 @@ class StockSupply extends Model
         return $this->belongsTo(Article::class);
     }
 
-    public function supplier()
-    {
-        return $this->belongsTo(Supplier::class);
-    }
+
+
 }

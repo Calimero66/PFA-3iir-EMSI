@@ -44,6 +44,5 @@ Route::post('/login', [AuthController::class, 'login']);
     // Supplier routes
     Route::get('suppliers/with-counts', [SupplierController::class, 'getSuppliersWithCounts']);
     Route::get('suppliers/{supplier}/articles', [SupplierController::class, 'getArticles']);
-    Route::get('suppliers/{supplier}/stock-supplies', [SupplierController::class, 'getStockSupplies']);
     Route::apiResource('suppliers', SupplierController::class);
 // });

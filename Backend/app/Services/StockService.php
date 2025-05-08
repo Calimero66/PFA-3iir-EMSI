@@ -12,7 +12,8 @@ use Exception;
 class StockService
 {
     /**
-     * Add stock supply from a supplier
+     * Add stock supply for an article
+     * Always creates a new stock supply entry
      *
      * @param array $data
      * @return StockSupply
@@ -20,25 +21,87 @@ class StockService
     public function addSupply(array $data): StockSupply
     {
         return DB::transaction(function () use ($data) {
-            // Create the stock supply record
-            $stockSupply = StockSupply::create([
-                'article_id' => $data['article_id'],
-                'supplier_id' => $data['supplier_id'],
-                'quantity' => $data['quantity'],
-                'supply_date' => $data['supply_date'] ?? now()
-            ]);
+            $supplyDate = $data['supply_date'] ?? now();
 
-            // Update the article quantity
+            // Get the article to determine the supplier name for the movement record
             $article = Article::findOrFail($data['article_id']);
-            $article->increment('quantity', $data['quantity']);
+            $supplierName = $article->supplier ? $article->supplier->name : 'Unknown';
+
+            // Check if we should update an existing stock supply
+            $updateExisting = isset($data['update_existing']) && $data['update_existing'] === true;
+
+            if ($updateExisting) {
+                // Get the barcode of the current article
+                $barcode = $article->barcode;
+
+                // Find all articles with the same barcode
+                $articlesWithSameBarcode = Article::where('barcode', $barcode)->get();
+
+                // Find the existing stock supply for any article with the same barcode
+                $existingSupply = null;
+                foreach ($articlesWithSameBarcode as $articleWithSameBarcode) {
+                    $supply = StockSupply::where('article_id', $articleWithSameBarcode->id)->first();
+                    if ($supply) {
+                        $existingSupply = $supply;
+                        break;
+                    }
+                }
+
+                if ($existingSupply) {
+                    // Update the existing stock supply
+                    $existingSupply->quantity += $data['quantity'];
+
+                    // Update notes if provided
+                    if (isset($data['notes'])) {
+                        $existingSupply->notes = $data['notes'];
+                    }
+
+                    $existingSupply->save();
+                    $stockSupply = $existingSupply;
+                } else {
+                    // Create a new stock supply record if no existing one found
+                    $supplyData = [
+                        'article_id' => $data['article_id'],
+                        'quantity' => $data['quantity'],
+                        'supply_date' => $supplyDate
+                    ];
+
+                    // Add notes if provided
+                    if (isset($data['notes'])) {
+                        $supplyData['notes'] = $data['notes'];
+                    }
+
+                    $stockSupply = StockSupply::create($supplyData);
+                }
+            } else {
+                // Create a new stock supply record
+                $supplyData = [
+                    'article_id' => $data['article_id'],
+                    'quantity' => $data['quantity'],
+                    'supply_date' => $supplyDate
+                ];
+
+                // Add notes if provided
+                if (isset($data['notes'])) {
+                    $supplyData['notes'] = $data['notes'];
+                }
+
+                $stockSupply = StockSupply::create($supplyData);
+            }
+
+            // Update the article quantity only if we're not updating an existing stock supply
+            if (!$updateExisting) {
+                $article = Article::findOrFail($data['article_id']);
+                $article->increment('quantity', $data['quantity']);
+            }
 
             // Create a stock movement record
             StockMovement::create([
                 'article_id' => $data['article_id'],
                 'type' => 'in',
                 'quantity' => $data['quantity'],
-                'date' => $data['supply_date'] ?? now(),
-                'reason' => 'Supply from ' . Supplier::findOrFail($data['supplier_id'])->name,
+                'date' => $supplyDate,
+                'reason' => "Supply from {$supplierName}",
             ]);
 
             return $stockSupply;
@@ -74,7 +137,6 @@ class StockService
     public function getArticleSupplies(int $articleId)
     {
         return StockSupply::where('article_id', $articleId)
-            ->with('supplier')
             ->orderBy('supply_date', 'desc')
             ->get();
     }

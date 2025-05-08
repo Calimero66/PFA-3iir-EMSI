@@ -23,7 +23,7 @@ class StockSupplyController extends Controller
      */
     public function index()
     {
-        $supplies = StockSupply::with(['article', 'supplier'])
+        $supplies = StockSupply::with('article')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -39,7 +39,6 @@ class StockSupplyController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'article_id' => 'required|exists:articles,id',
-            'supplier_id' => 'required|exists:suppliers,id',
             'quantity' => 'required|integer|min:1',
             'supply_date' => 'nullable|date',
             'notes' => 'nullable|string',
@@ -53,12 +52,16 @@ class StockSupplyController extends Controller
         }
 
         try {
-            $supply = $this->stockService->addSupply($request->all());
+            // Check if we should update an existing stock supply
+            $data = $request->all();
+            $data['update_existing'] = true; // Always update existing stock supplies
+
+            $supply = $this->stockService->addSupply($data);
 
             return response()->json([
-                'message' => 'Stock supply added successfully',
-                'data' => $supply->load(['article', 'supplier'])
-            ], 201);
+                'message' => 'Stock supply added or updated successfully',
+                'data' => $supply->load('article')
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to add stock supply',
@@ -73,7 +76,7 @@ class StockSupplyController extends Controller
     public function show(StockSupply $stockSupply)
     {
         return response()->json([
-            'data' => $stockSupply->load(['article', 'supplier'])
+            'data' => $stockSupply->load('article')
         ]);
     }
 

@@ -22,8 +22,6 @@ class Supplier extends Model
         return $this->hasMany(Report::class);
     }
 
-    public function stockSupplies()
-    {
-        return $this->hasMany(StockSupply::class);
-    }
+
+
 }
