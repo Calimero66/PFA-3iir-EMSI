@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\StockSupplyController;
 use App\Http\Controllers\SupplierController;
 
@@ -45,4 +46,11 @@ Route::post('/login', [AuthController::class, 'login']);
     Route::get('suppliers/with-counts', [SupplierController::class, 'getSuppliersWithCounts']);
     Route::get('suppliers/{supplier}/articles', [SupplierController::class, 'getArticles']);
     Route::apiResource('suppliers', SupplierController::class);
+
+    // Report routes
+    Route::get('reports', [ReportController::class, 'index']);
+    Route::get('reports/type/{type}', [ReportController::class, 'getByType']);
+    Route::get('reports/article/{articleId}', [ReportController::class, 'getByArticle']);
+    Route::get('reports/{id}/ticket', [ReportController::class, 'generateTicket']);
+    Route::get('reports/{id}', [ReportController::class, 'show']);
 // });

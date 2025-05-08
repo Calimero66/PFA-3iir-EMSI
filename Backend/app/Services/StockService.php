@@ -8,9 +8,16 @@ use App\Models\StockSupply;
 use App\Models\Supplier;
 use Illuminate\Support\Facades\DB;
 use Exception;
+use App\Services\ReportService;
 
 class StockService
 {
+    protected $reportService;
+
+    public function __construct(ReportService $reportService)
+    {
+        $this->reportService = $reportService;
+    }
     /**
      * Add stock supply for an article
      * Always creates a new stock supply entry
@@ -96,13 +103,21 @@ class StockService
             }
 
             // Create a stock movement record
-            StockMovement::create([
+            $stockMovement = StockMovement::create([
                 'article_id' => $data['article_id'],
                 'type' => 'in',
                 'quantity' => $data['quantity'],
                 'date' => $supplyDate,
                 'reason' => "Supply from {$supplierName}",
             ]);
+
+            // Create a report for this stock movement
+            $reportData = [
+                'supplier_id' => $article->supplier_id ?? null,
+                'details' => $data['notes'] ?? "Supply for article {$article->name} (Barcode: {$article->barcode})",
+            ];
+
+            $this->reportService->createStockMovementReport($stockMovement, $reportData);
 
             return $stockSupply;
         });

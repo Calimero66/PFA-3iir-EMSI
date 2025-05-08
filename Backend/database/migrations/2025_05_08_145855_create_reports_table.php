@@ -15,10 +15,11 @@ return new class extends Migration
             $table->id();
             $table->enum('type', ['sale', 'supply']);
             $table->dateTime('report_date');
-            $table->foreignId('user_id')->constrained('users', 'id')->onDelete('cascade');
+            $table->foreignId('user_id')->nullable()->constrained('users', 'id')->nullOnDelete();
             $table->foreignId('stock_movement_id')->constrained('stock_movements', 'id')->onDelete('cascade');
-            $table->foreignId('supplier_id')->constrained('suppliers', 'id')->onDelete('cascade');
-            $table->foreignId('order_line_id')->constrained('order_lines', 'id')->onDelete('cascade');
+            $table->foreignId('supplier_id')->nullable()->constrained('suppliers', 'id')->nullOnDelete();
+            $table->foreignId('order_line_id')->nullable()->constrained('order_lines', 'id')->nullOnDelete();
+            $table->text('details')->nullable(); // Additional details or notes about the report
             $table->timestamps();
         });
     }

@@ -12,7 +12,8 @@ class Report extends Model
         'user_id',
         'stock_movement_id',
         'supplier_id',
-        'order_line_id'
+        'order_line_id',
+        'details'
     ];
 
 

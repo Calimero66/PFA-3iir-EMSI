@@ -8,6 +8,7 @@ use App\Models\StockMovement;
 use App\Models\StockSupply;
 use App\Models\Supplier;
 use App\Services\StockService;
+use App\Services\ReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,7 +25,8 @@ class StockServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->stockService = new StockService();
+        $reportService = new ReportService();
+        $this->stockService = new StockService($reportService);
 
         // Create test data
         $this->category = Category::create([
