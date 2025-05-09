@@ -9,6 +9,7 @@ use App\Models\Supplier;
 use App\Models\OrderLine;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ReportService
 {
@@ -22,10 +23,28 @@ class ReportService
     public function createStockMovementReport(StockMovement $stockMovement, array $data = []): Report
     {
         return DB::transaction(function () use ($stockMovement, $data) {
+            // Try to get user ID from data first (explicit passing takes precedence)
+            $userId = isset($data['user_id']) ? (int) $data['user_id'] : null;
+
+            // If not provided in data, try to get from authenticated user
+            if (!$userId) {
+                $userId = Auth::id();
+                Log::info('ReportService: Using authenticated user ID: ' . ($userId ?? 'null'));
+            } else {
+                Log::info('ReportService: Using provided user ID: ' . $userId);
+            }
+
+            // If still no user ID, try to get the first user as a fallback
+            if (!$userId) {
+                $user = User::first();
+                $userId = $user ? (int) $user->id : null;
+                Log::info('ReportService: Using fallback user ID: ' . ($userId ?? 'null'));
+            }
+
             $reportData = [
                 'type' => $stockMovement->type === 'in' ? 'supply' : 'sale',
                 'report_date' => $data['report_date'] ?? now(),
-                'user_id' => $data['user_id'] ?? Auth::id(),
+                'user_id' => $userId,
                 'stock_movement_id' => $stockMovement->id,
                 'supplier_id' => $data['supplier_id'] ?? null,
                 'order_line_id' => $data['order_line_id'] ?? null,

@@ -3,13 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Article;
-use App\Models\StockMovement;
-use App\Models\StockSupply;
-use App\Models\Supplier;
+use App\Models\User;
 use App\Services\StockService;
 use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ArticleController extends Controller
 {
@@ -120,12 +118,26 @@ class ArticleController extends Controller
             // Create a new article
             $article = Article::create($validated);
 
+            // Get the authenticated user or use a default user
+            $user = auth()->user();
+
+            if ($user) {
+                $userId = $user->id;
+                Log::info('ArticleController: Using authenticated user ID: ' . $userId);
+            } else {
+                // Try to get the first user as a fallback
+                $user = User::first();
+                $userId = $user ? $user->id : null;
+                Log::info('ArticleController: Using fallback user ID: ' . ($userId ?? 'null'));
+            }
+
             // Prepare supply data
             $supplyData = [
                 'article_id' => $article->id,
                 'quantity' => $validated['quantity'],
                 'supply_date' => now(),
-                'update_existing' => true // Flag to update existing stock supply by barcode
+                'update_existing' => true, // Flag to update existing stock supply by barcode
+                'user_id' => (int) $userId // Pass the user ID as an integer
             ];
 
             // Add notes if provided

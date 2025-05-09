@@ -6,7 +6,9 @@ use App\Models\Article;
 use App\Models\StockMovement;
 use App\Models\StockSupply;
 use App\Models\Supplier;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Exception;
 use App\Services\ReportService;
 
@@ -36,6 +38,7 @@ class StockService
 
             // Check if we should update an existing stock supply
             $updateExisting = isset($data['update_existing']) && $data['update_existing'] === true;
+            // $updateExisting = isset($data['update_existing']) === true;
 
             if ($updateExisting) {
                 // Get the barcode of the current article
@@ -116,6 +119,14 @@ class StockService
                 'supplier_id' => $article->supplier_id ?? null,
                 'details' => $data['notes'] ?? "Supply for article {$article->name} (Barcode: {$article->barcode})",
             ];
+
+            // Explicitly pass the user ID if provided
+            if (isset($data['user_id'])) {
+                $reportData['user_id'] = $data['user_id'];
+                Log::info('StockService: Using provided user_id: ' . $data['user_id']);
+            } else {
+                Log::info('StockService: No user_id provided in data');
+            }
 
             $this->reportService->createStockMovementReport($stockMovement, $reportData);
 

@@ -62,10 +62,13 @@ class ReportControllerTest extends TestCase
     public function it_can_list_all_reports()
     {
         // Arrange - Create a stock supply which will generate a report
+        $this->actingAs($this->user); // Authenticate the user
+
         $this->stockService->addSupply([
             'article_id' => $this->article->id,
             'quantity' => 10,
-            'notes' => 'Test supply'
+            'notes' => 'Test supply',
+            'user_id' => $this->user->id // Explicitly set the user ID
         ]);
 
         // Act
@@ -96,10 +99,13 @@ class ReportControllerTest extends TestCase
     public function it_can_show_a_report()
     {
         // Arrange - Create a stock supply which will generate a report
+        $this->actingAs($this->user); // Authenticate the user
+
         $this->stockService->addSupply([
             'article_id' => $this->article->id,
             'quantity' => 10,
-            'notes' => 'Test supply'
+            'notes' => 'Test supply',
+            'user_id' => $this->user->id // Explicitly set the user ID
         ]);
 
         $report = Report::first();
@@ -130,10 +136,13 @@ class ReportControllerTest extends TestCase
     public function it_can_generate_a_ticket_for_a_report()
     {
         // Arrange - Create a stock supply which will generate a report
+        $this->actingAs($this->user); // Authenticate the user
+
         $this->stockService->addSupply([
             'article_id' => $this->article->id,
             'quantity' => 10,
-            'notes' => 'Test supply'
+            'notes' => 'Test supply',
+            'user_id' => $this->user->id // Explicitly set the user ID
         ]);
 
         $report = Report::first();
@@ -160,10 +169,13 @@ class ReportControllerTest extends TestCase
     public function it_can_get_reports_by_type()
     {
         // Arrange - Create a stock supply which will generate a report
+        $this->actingAs($this->user); // Authenticate the user
+
         $this->stockService->addSupply([
             'article_id' => $this->article->id,
             'quantity' => 10,
-            'notes' => 'Test supply'
+            'notes' => 'Test supply',
+            'user_id' => $this->user->id // Explicitly set the user ID
         ]);
 
         // Act
@@ -189,10 +201,13 @@ class ReportControllerTest extends TestCase
     public function it_can_get_reports_by_article()
     {
         // Arrange - Create a stock supply which will generate a report
+        $this->actingAs($this->user); // Authenticate the user
+
         $this->stockService->addSupply([
             'article_id' => $this->article->id,
             'quantity' => 10,
-            'notes' => 'Test supply'
+            'notes' => 'Test supply',
+            'user_id' => $this->user->id // Explicitly set the user ID
         ]);
 
         // Act
