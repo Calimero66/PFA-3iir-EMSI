@@ -9,8 +9,8 @@ class Article extends Model
 {
     use HasFactory;
 
-    // protected $fillable = ['barcode', 'name', 'type', 'price', 'quantity', 'category_id', 'supplier_id'];
-    protected $fillable = ['barcode', 'name', 'price', 'quantity', 'category_id', 'supplier_id'];
+    // protected $fillable = ['barcode', 'name', 'type', 'price', 'quantity', 'category_id', 'supplier_id', 'user_id'];
+    protected $fillable = ['barcode', 'name', 'price', 'quantity', 'category_id', 'supplier_id', 'user_id'];
 
 
     public function stockMovements()
@@ -37,5 +37,10 @@ class Article extends Model
     public function stockSupplies()
     {
         return $this->hasMany(StockSupply::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

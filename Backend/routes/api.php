@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\StockSupplyController;
 use App\Http\Controllers\SupplierController;
@@ -21,7 +22,7 @@ Route::get("/", function (Request $request) {
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-// Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
         return $request->user();
@@ -53,4 +54,8 @@ Route::post('/login', [AuthController::class, 'login']);
     Route::get('reports/article/{articleId}', [ReportController::class, 'getByArticle']);
     Route::get('reports/{id}/ticket', [ReportController::class, 'generateTicket']);
     Route::get('reports/{id}', [ReportController::class, 'show']);
-// });
+
+    // Order routes
+    Route::post('orders/sell', [OrderController::class, 'sellArticle']);
+    Route::apiResource('orders', OrderController::class);
+});

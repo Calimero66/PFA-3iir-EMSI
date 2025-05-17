@@ -88,7 +88,7 @@ class ArticleController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'barcode' => 'required|string|max:12',
+            'barcode' => 'required|string|size:12',
             'name' => 'required|string|max:255',
             // 'type' => 'nullable|string|max:255',
             'price' => 'required|numeric|min:0',
@@ -115,9 +115,6 @@ class ArticleController extends Controller
                 // Continue with the creation process
             }
 
-            // Create a new article
-            $article = Article::create($validated);
-
             // Get the authenticated user or use a default user
             $user = auth()->user();
 
@@ -130,6 +127,12 @@ class ArticleController extends Controller
                 $userId = $user ? $user->id : null;
                 Log::info('ArticleController: Using fallback user ID: ' . ($userId ?? 'null'));
             }
+
+            // Add user_id to the validated data
+            $validated['user_id'] = $userId;
+
+            // Create a new article
+            $article = Article::create($validated);
 
             // Prepare supply data
             $supplyData = [
@@ -177,7 +180,7 @@ class ArticleController extends Controller
     public function update(Request $request, Article $article)
     {
         $validated = $request->validate([
-            'barcode' => "sometimes|required|string|max:12",
+            'barcode' => "sometimes|required|string|size:12",
             'name' => 'sometimes|required|string|max:255',
             'price' => 'sometimes|required|numeric|min:0',
             'quantity' => 'sometimes|required|integer|min:0',
