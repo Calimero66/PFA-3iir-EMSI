@@ -6,16 +6,25 @@ import Dashboard from "./pages/dashboard";
 import Stock from "./pages/stock";
 import Reports from "./pages/reports";
 import Commandes from "./pages/commandes";
+import ProtectedRoute from "./components/ProtectedRoute";
+import PublicRoute from "./components/PublicRoute";
 
 const router = createBrowserRouter([
     {
         path: "/",
-        element: <Login />,
+        element: (
+            <PublicRoute>
+                <Login />
+            </PublicRoute>
+        ),
     },
     {
-
         path: "/",
-        element: <Layout />,
+        element: (
+            <ProtectedRoute>
+                <Layout />
+            </ProtectedRoute>
+        ),
         children: [
             { path: "/Dashboard", element: <Dashboard />, index: true },
             { path: "/Agents", element: <Agents /> },
@@ -23,7 +32,6 @@ const router = createBrowserRouter([
             { path: "/Reports", element: <Reports /> },
             { path: "/Commandes", element: <Commandes /> },
         ],
-
     },
 ]);
 

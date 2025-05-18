@@ -1,15 +1,61 @@
 import { useState } from "react"
+import Cookies from 'js-cookie'
+
 import { TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LoginCard } from "@/components/loginCard"
 import dashboardImage from "@/images/1744766807540.jpg"
 
-const login = () => {
+import api from "@/lib/api"
+import { toast, Toaster } from "sonner"
+import { useNavigate } from 'react-router-dom'
+
+const LoginPage = () => {
+    const navigate = useNavigate()
     const [showLogin, setShowLogin] = useState(false)
+    const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [loading, setLoading] = useState(false)
+
+    const handleLogin = async () => {
+        setLoading(true)
+        try {
+            const response = await api.post("/login", { 
+                email,  // Changed from username to email
+                password 
+            })
+            
+            // Store the token in cookies instead of localStorage
+            const { access_token } = response.data
+            Cookies.set('token', access_token, { 
+                expires: 7, // expires in 7 days
+                secure: true, // only transmitted over HTTPS
+                sameSite: 'strict' // protection against CSRF
+            })
+            
+            // Update auth header for future requests
+            api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
+            
+            toast.success("Login successful", {
+                duration: 1000,
+            })
+            
+            setTimeout(() => {
+                navigate("/dashboard") // Changed from /profile to /dashboard
+            }, 1000)
+        } catch (err) {
+            toast.error("Invalid email or password")
+            console.error(err)
+        } finally {
+            setLoading(false)
+        }
+    }
 
     return (
         <div className="min-h-screen bg-black text-white">
-            {/* Navigation - Simplified with only logo and login */}
+            <Toaster richColors />
+
+            {/* Header */}
             <header className="container mx-auto flex items-center justify-between py-6">
                 <div className="flex items-center gap-2">
                     <TrendingUp className="h-6 w-6 text-purple-500" />
@@ -24,7 +70,7 @@ const login = () => {
                 </Button>
             </header>
 
-            {/* Hero Section - Just headline, subheading and dashboard image */}
+            {/* Hero Section */}
             <section className="container mx-auto py-20 text-center">
                 <h1 className="text-6xl font-bold tracking-tight mb-6">Manage inventory at the speed of thought</h1>
                 <p className="text-gray-400 max-w-2xl mx-auto mb-16 text-lg">
@@ -32,9 +78,9 @@ const login = () => {
                     simple way to manage their inventory.
                 </p>
 
-                {/* Dashboard Preview */}
+                {/* Image */}
                 <div className="relative w-full max-w-5xl mx-auto">
-                    <div className="bg-gradient-to-b from-purple-500/20 to-transparent absolute -top-10 left-1/2 -translate-x-1/2 w-full h-40 blur-3xl rounded-full"></div>
+                    <div className="bg-gradient-to-b from-purple-500/20 to-transparent absolute -top-10 left-1/2 -translate-x-1/2 w-full h-40 blur-3xl rounded-full" />
                     <img
                         src={dashboardImage}
                         width={1200}
@@ -45,7 +91,7 @@ const login = () => {
                 </div>
             </section>
 
-            {/* Footer - Small with logo left and copyright right */}
+            {/* Footer */}
             <footer className="border-t border-gray-800 py-4">
                 <div className="container mx-auto">
                     <div className="flex items-center justify-between">
@@ -58,10 +104,20 @@ const login = () => {
                 </div>
             </footer>
 
-            {/* Login Card Modal */}
-            {showLogin && <LoginCard onClose={() => setShowLogin(false)} />}
+            {/* Login Modal */}
+            {showLogin && (
+                <LoginCard
+                    onClose={() => setShowLogin(false)}
+                    email={email} 
+                    password={password}
+                    setEmail={setEmail}
+                    setPassword={setPassword}
+                    handleLogin={handleLogin}
+                    loading={loading}
+                />
+
+            )}
         </div>
     )
 }
-
-export default login
+export default LoginPage
