@@ -21,7 +21,7 @@ const LoginPage = () => {
         setLoading(true)
         try {
             const response = await api.post("/login", { 
-                email,  // Changed from username to email
+                email,
                 password 
             })
             
@@ -41,7 +41,7 @@ const LoginPage = () => {
             })
             
             setTimeout(() => {
-                navigate("/dashboard") // Changed from /profile to /dashboard
+                navigate("/dashboard")
             }, 1000)
         } catch (err) {
             toast.error("Invalid email or password")
