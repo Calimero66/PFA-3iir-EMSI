@@ -15,6 +15,7 @@ class AuthController extends Controller
         $fields = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|unique:users',
+            'role' => 'required|in:Admin,Agent,Manager',
             'password' => 'required|string|confirmed|min:6',
         ]);
 
@@ -33,10 +34,10 @@ class AuthController extends Controller
             'email' => 'required|email|exists:users,email',
             'password' => 'required',
         ]);
-    
+
         $user = User::where('email', $request->email)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials.'],
             ]);
@@ -47,7 +48,7 @@ class AuthController extends Controller
         return response()->json([
             'user' => $user,
             'access_token' => $token
-            
+
         ]);
     }
 

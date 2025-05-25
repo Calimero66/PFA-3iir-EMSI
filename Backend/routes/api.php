@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\UserController;
+use App\Http\Middleware\IsAdmin;
+use App\Http\Middleware\IsManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
@@ -26,6 +29,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
         return $request->user();
+    });
+
+    Route::middleware(IsAdmin::class)->group(function () {
+
+        Route::post('/createRole', [UserController::class, 'store']);
+        Route::apiResource('users', UserController::class);
+    });
+    Route::middleware(IsManager::class)->group(function () {
+
+        Route::post('/createAgent', [UserController::class, 'CreateAgent']);
     });
 
     // Article routes

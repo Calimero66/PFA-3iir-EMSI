@@ -90,21 +90,49 @@ class SupplierController extends Controller
      * @param  \App\Models\Supplier  $supplier
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, Supplier $supplier)
+    public function update(Request $request, $id)
     {
-        $validated = $request->validate([
+        // Find supplier manually like in destroy method
+        $supplier = Supplier::find($id);
+        
+        if (!$supplier) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Supplier not found'
+            ], 404);
+        }
+
+        $rules = [
             'name' => 'sometimes|required|string|max:255',
             'address' => 'sometimes|required|string|max:255',
             'phone' => 'sometimes|required|string|max:20',
             'email' => 'sometimes|required|email|unique:suppliers,email,' . $supplier->id,
-        ]);
+        ];
 
-        $supplier->update($validated);
+        // Validate the fields
+        $fields = $request->validate($rules);
+        // Check if any fields were provided
+        // if (empty($fields)) {
+        //     return response()->json([
+        //         'status' => 'error',
+        //         'message' => 'No valid fields provided for update'
+        //     ], 422);
+        // }
+        try {
+            $supplier->update($fields);
 
-        return response()->json([
-            'message' => 'Supplier updated successfully',
-            'supplier' => $supplier
-        ]);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Supplier updated successfully',
+                'data' => $supplier->fresh()
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Update failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -113,25 +141,35 @@ class SupplierController extends Controller
      * @param  \App\Models\Supplier  $supplier
      * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy(Supplier $supplier)
+    public function destroy($id)
     {
+        // Find supplier manually
+        $supplier = Supplier::find($id);
+        
+        if (!$supplier) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Supplier not found'
+            ], 404);
+        }
+
         // Check if the supplier has any associated articles
         $articlesCount = Article::where('supplier_id', $supplier->id)->count();
 
         if ($articlesCount > 0) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'Cannot delete supplier because it has associated articles',
                 'articles_count' => $articlesCount
             ], 409); // Conflict status code
         }
 
-
-
         $supplier->delete();
 
         return response()->json([
+            'status' => 'success',
             'message' => 'Supplier deleted successfully'
-        ]);
+        ], 200);
     }
 
     /**

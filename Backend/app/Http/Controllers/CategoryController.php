@@ -82,37 +82,78 @@ class CategoryController extends Controller
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Category  $category
+     * @param  int  $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, Category $category)
+    public function update(Request $request, $id)
     {
-        $validated = $request->validate([
+        // Find category manually like in destroy method
+        $category = Category::find($id);
+        
+        if (!$category) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Category not found'
+            ], 404);
+        }
+
+        $rules = [
             'name' => 'sometimes|required|string|max:255|unique:categories,name,' . $category->id,
             'description' => 'nullable|string'
-        ]);
+        ];
 
-        $category->update($validated);
+        // Validate the fields
+        $fields = $request->validate($rules);
 
-        return response()->json([
-            'message' => 'Category updated successfully',
-            'category' => $category
-        ]);
+        // Check if any fields were provided
+        if (empty($fields)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No valid fields provided for update'
+            ], 422);
+        }
+
+        try {
+            $category->update($fields);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Category updated successfully',
+                'data' => $category->fresh()
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Update failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
      * Remove the specified resource from storage.
      *
-     * @param  \App\Models\Category  $category
+     * @param  int  $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy(Category $category)
+    public function destroy($id)
     {
+        // Find category manually
+        $category = Category::find($id);
+        
+        if (!$category) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Category not found'
+            ], 404);
+        }
+
         // Check if the category has articles
         $articlesCount = $category->articles()->count();
 
         if ($articlesCount > 0) {
             return response()->json([
+                'status' => 'error',
                 'message' => 'Cannot delete category because it has ' . $articlesCount . ' articles associated with it'
             ], 409); // 409 Conflict
         }
@@ -120,8 +161,9 @@ class CategoryController extends Controller
         $category->delete();
 
         return response()->json([
+            'status' => 'success',
             'message' => 'Category deleted successfully'
-        ]);
+        ], 200);
     }
 
     /**

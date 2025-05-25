@@ -22,10 +22,10 @@ export function Sidebar() {
             active: pathname === "/stock",
         },
         {
-            label: "Agents",
+            label: "Users",
             icon: Users,
-            to: "/agents",
-            active: pathname === "/agents",
+            to: "/users",
+            active: pathname === "/users",
         }, {
             label: "Reports",
             icon: BarChart,
@@ -36,6 +36,18 @@ export function Sidebar() {
             icon: ShoppingCart,
             to: "/commandes",
             active: pathname === "/commandes",
+        },
+        {
+            label: "Suppliers",
+            icon: Package,
+            to: "/suppliers",
+            active: pathname === "/suppliers",
+        },
+        {
+            label: "Categories",
+            icon: Package,
+            to: "/categories",
+            active: pathname === "/categories",
         },
     ]
 

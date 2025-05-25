@@ -12,13 +12,26 @@ const api: AxiosInstance = axios.create({
     }
 });
 
-// Request interceptor
+// Request interceptor with enhanced debugging
 api.interceptors.request.use((config) => {
     const token = Cookies.get('token')
+    
+    // Enhanced debugging
+    console.log('Current cookies:', Cookies.get())
+    console.log('Token from cookie:', token)
+    console.log('Original headers:', config.headers)
+    
     if (token) {
         config.headers.Authorization = `Bearer ${token}`
+        console.log('Updated headers with token:', config.headers)
+    } else {
+        console.warn('No token found in cookies')
     }
+    
     return config
+}, (error) => {
+    console.error('Request interceptor error:', error)
+    return Promise.reject(error)
 })
 
 // Response interceptor to handle token expiration

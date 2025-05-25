@@ -56,9 +56,8 @@ class StockSupplyController extends Controller
         try {
             // Check if we should update an existing stock supply
             $data = $request->all();
-            $data['update_existing'] = true; // Always update existing stock supplies
+            $data['update_existing'] = true; 
 
-            // Get the authenticated user or use a default user
             $user = auth()->user();
 
             if ($user) {
