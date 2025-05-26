@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { Trash2, PencilLine } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,11 +14,23 @@ interface StockItem {
     quantity: number
     category_id: number
     supplier_id: number
+    user_id: number
     category_name: string
     supplier_name: string
+    user_name: string
     notes?: string
     created_at: string
     updated_at: string
+}
+
+interface StockFormData {
+    barcode: string
+    name: string
+    price: string
+    quantity: string
+    category_id: string
+    supplier_id: string
+    notes: string
 }
 
 export default function StockPage() {
@@ -28,18 +38,7 @@ export default function StockPage() {
     const [loading, setLoading] = useState(true)
     const [isEditing, setIsEditing] = useState(false)
     const [editingId, setEditingId] = useState<number | null>(null)
-    const [initialFormData, setInitialFormData] = useState<
-        | {
-            barcode: string
-            name: string
-            price: string
-            quantity: string
-            category_id: string
-            supplier_id: string
-            notes: string
-        }
-        | undefined
-    >(undefined)
+    const [initialFormData, setInitialFormData] = useState<StockFormData | undefined>(undefined)
 
     useEffect(() => {
         fetchStockItems()
@@ -49,7 +48,43 @@ export default function StockPage() {
         try {
             setLoading(true)
             const response = await api.get("/articles")
-            setStockItems(response.data.data || [])
+            const articles = response.data.data || []
+
+            // Fetch category and user names for each article
+            const enrichedArticles = await Promise.all(
+                articles.map(async (item: any) => {
+                    try {
+                        // Fetch category name
+                        const categoryResponse = await api.get(`/categories/${item.category_id}`)
+                        const categoryName = categoryResponse.data.data?.name || "Unknown Category"
+
+                        // Fetch user name
+                        const userResponse = await api.get(`/users/${item.user_id}`)
+                        const userName = userResponse.data.data?.name || "Unknown User"
+
+                        // Fetch supplier name
+                        const supplierResponse = await api.get(`/suppliers/${item.supplier_id}`)
+                        const supplierName = supplierResponse.data.data?.name || "Unknown Supplier"
+
+                        return {
+                            ...item,
+                            category_name: categoryName,
+                            user_name: userName,
+                            supplier_name: supplierName,
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching details for article ${item.id}:`, error)
+                        return {
+                            ...item,
+                            category_name: "Unknown Category",
+                            user_name: "Unknown User",
+                            supplier_name: "Unknown Supplier",
+                        }
+                    }
+                }),
+            )
+
+            setStockItems(enrichedArticles)
         } catch (error) {
             console.error("Error fetching stock items:", error)
             setStockItems([])
@@ -59,15 +94,7 @@ export default function StockPage() {
     }
 
     const addStock = async (
-        formData: {
-            barcode: string
-            name: string
-            price: string
-            quantity: string
-            category_id: string
-            supplier_id: string
-            notes: string
-        },
+        formData: StockFormData,
         isEditing: boolean,
         editingId: number | null,
         categoryName: string,
@@ -203,6 +230,7 @@ export default function StockPage() {
                                         <TableHead className="text-zinc-400">Supplier</TableHead>
                                         <TableHead className="text-zinc-400">Created At</TableHead>
                                         <TableHead className="text-zinc-400">Updated At</TableHead>
+                                        <TableHead className="text-zinc-400">User</TableHead>
                                         <TableHead className="text-zinc-400 text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -221,6 +249,7 @@ export default function StockPage() {
                                             <TableCell className="text-zinc-300 text-sm">
                                                 {new Date(item.updated_at).toLocaleDateString()}
                                             </TableCell>
+                                            <TableCell className="text-zinc-300">{item.user_name}</TableCell>
                                             <TableCell>
                                                 <div className="flex justify-end gap-2">
                                                     <Button
