@@ -26,38 +26,13 @@ class ArticleController extends Controller
     public function index(Request $request)
     {
         $query = Article::query();
-
-        // Search functionality
-        if ($request->has('search')) {
-            $searchTerm = $request->search;
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('name', 'like', "%{$searchTerm}%")
-                    ->orWhere('type', 'like', "%{$searchTerm}%")
-                    ->orWhere('barcode', 'like', "%{$searchTerm}%");
-            });
-        }
-
-        // Filter by type
-        if ($request->has('type')) {
-            $query->where('type', $request->type);
-        }
-
-        // Filter by low stock
-        if ($request->has('low_stock') && $request->low_stock === 'true') {
-            $threshold = $request->get('threshold', 10); // Default threshold is 10
-            $query->where('quantity', '<', $threshold);
-        }
-
-        // Sort by field
-        if ($request->has('sort_by')) {
-            $sortDirection = $request->get('sort_direction', 'asc');
-            $query->orderBy($request->sort_by, $sortDirection);
-        } else {
-            $query->orderBy('name', 'asc');
-        }
-
-        $articles = $query->get();
-
+    
+        $articles = $query->with([
+            'category:id,name', 
+            'supplier:id,name',
+            'user:id,name'  // Add user relationship with name
+        ])->get();
+    
         return response()->json([
             'data' => $articles
         ]);

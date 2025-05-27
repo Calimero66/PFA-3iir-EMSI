@@ -68,12 +68,22 @@ class CategoryController extends Controller
     /**
      * Display the specified resource.
      *
-     * @param  \App\Models\Category  $category
+     * @param  int  $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function show(Category $category)
+    public function show($id)
     {
+        $category = Category::find($id);
+        
+        if (!$category) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Category not found'
+            ], 404);
+        }
+
         return response()->json([
+            'status' => 'success',
             'data' => $category
         ]);
     }

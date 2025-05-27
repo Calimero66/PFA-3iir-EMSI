@@ -10,14 +10,23 @@ interface StockItem {
     id: number
     barcode: string
     name: string
-    price: number
+    price: number | string  // Handle both formats
     quantity: number
     category_id: number
     supplier_id: number
     user_id: number
-    category_name: string
-    supplier_name: string
-    user_name: string
+    category: {
+        id: number
+        name: string
+    }
+    supplier: {
+        id: number
+        name: string
+    }
+    user: {
+        id: number
+        name: string
+    }
     notes?: string
     created_at: string
     updated_at: string
@@ -48,46 +57,24 @@ export default function StockPage() {
         try {
             setLoading(true)
             const response = await api.get("/articles")
-            const articles = response.data.data || []
-
-            // Fetch category and user names for each article
-            const enrichedArticles = await Promise.all(
-                articles.map(async (item: any) => {
-                    try {
-                        // Fetch category name
-                        const categoryResponse = await api.get(`/categories/${item.category_id}`)
-                        const categoryName = categoryResponse.data.data?.name || "Unknown Category"
-
-                        // Fetch user name
-                        const userResponse = await api.get(`/users/${item.user_id}`)
-                        const userName = userResponse.data.data?.name || "Unknown User"
-
-                        // Fetch supplier name
-                        const supplierResponse = await api.get(`/suppliers/${item.supplier_id}`)
-                        const supplierName = supplierResponse.data.data?.name || "Unknown Supplier"
-
-                        return {
-                            ...item,
-                            category_name: categoryName,
-                            user_name: userName,
-                            supplier_name: supplierName,
-                        }
-                    } catch (error) {
-                        console.error(`Error fetching details for article ${item.id}:`, error)
-                        return {
-                            ...item,
-                            category_name: "Unknown Category",
-                            user_name: "Unknown User",
-                            supplier_name: "Unknown Supplier",
-                        }
-                    }
-                }),
-            )
-
-            setStockItems(enrichedArticles)
+            console.log("🚀 ~ fetchStockItems ~ response:", response)
+            
+            // Ensure we're setting an array to state
+            if (Array.isArray(response.data)) {
+                setStockItems(response.data)
+            } else if (response.data && typeof response.data === 'object') {
+                // If response.data is an object that might contain the array
+                // Check common API response patterns
+                const items = response.data.articles || response.data.data || response.data.items || []
+                setStockItems(items)
+            } else {
+                // Fallback to empty array if data format is unexpected
+                console.error("Unexpected API response format:", response.data)
+                setStockItems([])
+            }
         } catch (error) {
             console.error("Error fetching stock items:", error)
-            setStockItems([])
+            setStockItems([]) // Ensure we reset to empty array on error
         } finally {
             setLoading(false)
         }
@@ -115,15 +102,21 @@ export default function StockPage() {
                 // Update existing item
                 await api.put(`/articles/${editingId}`, payload)
 
-                // Update the item in local state
+                // Update the item in local state with nested objects
                 setStockItems((prev) =>
                     prev.map((item) =>
                         item.id === editingId
                             ? {
                                 ...item,
                                 ...payload,
-                                category_name: categoryName,
-                                supplier_name: supplierName,
+                                category: {
+                                    id: Number.parseInt(formData.category_id),
+                                    name: categoryName
+                                },
+                                supplier: {
+                                    id: Number.parseInt(formData.supplier_id),
+                                    name: supplierName
+                                }
                             }
                             : item,
                     ),
@@ -131,13 +124,8 @@ export default function StockPage() {
             } else {
                 // Create new item
                 const response = await api.post("/articles", payload)
-                const newItem = {
-                    ...response.data.data,
-                    category_name: categoryName,
-                    supplier_name: supplierName,
-                }
-
-                setStockItems((prev) => [...prev, newItem])
+                // The response now contains nested category and supplier
+                setStockItems((prev) => [...prev, response.data])
             }
 
             // Reset editing state
@@ -157,7 +145,7 @@ export default function StockPage() {
             setInitialFormData({
                 barcode: item.barcode,
                 name: item.name,
-                price: item.price.toString(),
+                price: typeof item.price === 'string' ? item.price : item.price.toString(),
                 quantity: item.quantity.toString(),
                 category_id: item.category_id.toString(),
                 supplier_id: item.supplier_id.toString(),
@@ -241,15 +229,15 @@ export default function StockPage() {
                                             <TableCell className="text-zinc-300 font-medium">{item.name}</TableCell>
                                             <TableCell className="text-zinc-300">${item.price}</TableCell>
                                             <TableCell className="text-zinc-300">{item.quantity}</TableCell>
-                                            <TableCell className="text-zinc-300">{item.category_name}</TableCell>
-                                            <TableCell className="text-zinc-300">{item.supplier_name}</TableCell>
+                                            <TableCell className="text-zinc-300">{item.category?.name || 'N/A'}</TableCell>
+                                            <TableCell className="text-zinc-300">{item.supplier?.name || 'N/A'}</TableCell>
                                             <TableCell className="text-zinc-300 text-sm">
                                                 {new Date(item.created_at).toLocaleDateString()}
                                             </TableCell>
                                             <TableCell className="text-zinc-300 text-sm">
                                                 {new Date(item.updated_at).toLocaleDateString()}
                                             </TableCell>
-                                            <TableCell className="text-zinc-300">{item.user_name}</TableCell>
+                                            <TableCell className="text-zinc-300">{item.user?.name || 'N/A'}</TableCell>
                                             <TableCell>
                                                 <div className="flex justify-end gap-2">
                                                     <Button

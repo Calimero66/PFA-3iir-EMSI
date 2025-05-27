@@ -33,7 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware(IsAdmin::class)->group(function () {
 
-        Route::post('/createRole', [UserController::class, 'store']);
+        // Route::post('/GetUserById', [UserController::class, 'GetUserById']);
         Route::apiResource('users', UserController::class);
     });
     Route::middleware(IsManager::class)->group(function () {

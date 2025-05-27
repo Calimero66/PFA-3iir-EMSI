@@ -73,12 +73,22 @@ class SupplierController extends Controller
     /**
      * Display the specified resource.
      *
-     * @param  \App\Models\Supplier  $supplier
+     * @param  int  $id
      * @return \Illuminate\Http\JsonResponse
      */
-    public function show(Supplier $supplier)
+    public function show($id)
     {
+        $supplier = Supplier::find($id);
+        
+        if (!$supplier) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Supplier not found'
+            ], 404);
+        }
+
         return response()->json([
+            'status' => 'success',
             'data' => $supplier
         ]);
     }
