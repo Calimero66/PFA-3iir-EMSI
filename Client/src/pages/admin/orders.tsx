@@ -1,14 +1,12 @@
 import { useState } from "react"
-import { Calendar, Download, MoreHorizontal, Plus, ShoppingCart, X } from "lucide-react"
+import { Calendar, Download, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import {
     AlertDialog,
@@ -21,6 +19,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import OrderItemsEditor from "@/components/OrderItemsEditor"
+import OrderTable from "@/components/OrderTable"
 
 // Define types
 type OrderItem = {
@@ -148,42 +147,10 @@ const formatDateForComparison = (date: Date) => {
     return date.toISOString().split("T")[0]
 }
 
-// Get payment status color
-const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-        case "Paid":
-            return "bg-green-500/20 text-green-500"
-        case "Pending":
-            return "bg-yellow-500/20 text-yellow-500"
-        case "Refunded":
-            return "bg-red-500/20 text-red-500"
-        default:
-            return "bg-zinc-500/20 text-zinc-400"
-    }
-}
-
 // Define a type for new order form items
 type NewOrderItem = {
     productId: string
     quantity: number
-}
-
-// Helper to find customer ID by name
-const findCustomerIdByName = (name: string): string => {
-    const customer = customers.find((c) => c.name === name)
-    return customer ? customer.id : ""
-}
-
-// Helper to find agent ID by name
-const findAgentIdByName = (name: string): string => {
-    const agent = agents.find((a) => a.name === name)
-    return agent ? agent.id : ""
-}
-
-// Helper to find product ID by name
-const findProductIdByName = (name: string): string => {
-    const product = products.find((p) => p.name === name)
-    return product ? product.id : ""
 }
 
 export default function CommandesPage() {
@@ -193,9 +160,7 @@ export default function CommandesPage() {
     const [orderDialogOpen, setOrderDialogOpen] = useState(false)
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
     const [newOrderDialogOpen, setNewOrderDialogOpen] = useState(false)
-    const [editOrderDialogOpen, setEditOrderDialogOpen] = useState(false)
     const [cancelOrderDialogOpen, setCancelOrderDialogOpen] = useState(false)
-    const [orderToEdit, setOrderToEdit] = useState<Order | null>(null)
     const [orderToCancel, setOrderToCancel] = useState<Order | null>(null)
 
     // State for new order form
@@ -215,23 +180,6 @@ export default function CommandesPage() {
         setOrderDialogOpen(true)
     }
 
-    const handleEditOrder = (order: Order) => {
-        setOrderToEdit(order)
-
-        // Convert order items to form items
-        const formItems = order.items.map((item) => ({
-            productId: findProductIdByName(item.name),
-            quantity: item.quantity,
-        }))
-
-        setOrderItems(formItems)
-        setCustomerId(findCustomerIdByName(order.customer))
-        setAgentId(findAgentIdByName(order.agent))
-        setPaymentStatus(order.paymentStatus)
-
-        setEditOrderDialogOpen(true)
-    }
-
     const handleCancelOrder = (order: Order) => {
         setOrderToCancel(order)
         setCancelOrderDialogOpen(true)
@@ -245,9 +193,6 @@ export default function CommandesPage() {
             setOrders(updatedOrders)
             setCancelOrderDialogOpen(false)
             setOrderToCancel(null)
-
-            // Show success message
-            // alert(`Order ${orderToCancel.id} has been cancelled.`)
         }
     }
 
@@ -297,22 +242,6 @@ export default function CommandesPage() {
     }
 
     const handleCreateOrder = () => {
-        // Validate form
-        // if (!customerId) {
-        //   alert("Please select a customer")
-        //   return
-        // }
-
-        // if (!agentId) {
-        //   alert("Please select an agent")
-        //   return
-        // }
-
-        // if (orderItems.some((item) => !item.productId)) {
-        //   alert("Please select a product for all items")
-        //   return
-        // }
-
         if (!customerId || !agentId || orderItems.some((item) => !item.productId)) {
             return
         }
@@ -345,72 +274,9 @@ export default function CommandesPage() {
         // Add the new order to the orders state
         setOrders([newOrder, ...orders])
 
-        // Show success message
-        // alert(`Order ${orderId} has been created successfully.`)
-
         // Reset form and close dialog
         resetOrderForm()
         setNewOrderDialogOpen(false)
-    }
-
-    const handleUpdateOrder = () => {
-        // Validate form
-        // if (!customerId) {
-        //   alert("Please select a customer")
-        //   return
-        // }
-
-        // if (!agentId) {
-        //   alert("Please select an agent")
-        //   return
-        // }
-
-        // if (orderItems.some((item) => !item.productId)) {
-        //   alert("Please select a product for all items")
-        //   return
-        // }
-
-        if (!customerId || !agentId || orderItems.some((item) => !item.productId)) {
-            return
-        }
-
-        if (!orderToEdit) {
-            return
-        }
-
-        // Update order
-        const customer = customers.find((c) => c.id === customerId)?.name || ""
-        const agent = agents.find((a) => a.id === agentId)?.name || ""
-
-        const updatedOrderItems: OrderItem[] = orderItems.map((item) => ({
-            name: getProductName(item.productId),
-            quantity: item.quantity,
-            price: formatPrice(getProductPrice(item.productId)),
-        }))
-
-        const total = calculateTotal()
-
-        const updatedOrder: Order = {
-            ...orderToEdit,
-            customer,
-            items: updatedOrderItems,
-            total,
-            paymentStatus,
-            agent,
-        }
-
-        // Update the orders state
-        const updatedOrders = orders.map((order) => (order.id === orderToEdit.id ? updatedOrder : order))
-
-        setOrders(updatedOrders)
-
-        // Show success message
-        // alert(`Order ${orderToEdit.id} has been updated successfully.`)
-
-        // Reset form and close dialog
-        resetOrderForm()
-        setEditOrderDialogOpen(false)
-        setOrderToEdit(null)
     }
 
     const resetOrderForm = () => {
@@ -569,95 +435,18 @@ export default function CommandesPage() {
                 </Card>
             </div>
 
-            <Card className="bg-zinc-900 border-zinc-800">
-                <CardHeader>
-                    <CardTitle>Orders</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="border-zinc-800">
-                                <TableHead>Order ID</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Customer</TableHead>
-                                <TableHead>Total</TableHead>
-                                <TableHead>Payment</TableHead>
-                                <TableHead>Agent</TableHead>
-                                <TableHead>Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredOrders.map((order) => (
-                                <TableRow key={order.id} className="border-zinc-800">
-                                    <TableCell className="font-medium text-white">{order.id}</TableCell>
-                                    <TableCell className="text-white">{formatDate(order.date)}</TableCell>
-                                    <TableCell className="text-white">{order.customer}</TableCell>
-                                    <TableCell className="text-white">{order.total}</TableCell>
-                                    <TableCell>
-                                        <span className={`px-2 py-1 rounded-full text-xs ${getPaymentStatusColor(order.paymentStatus)}`}>
-                                            {order.paymentStatus}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="text-white">{order.agent}</TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-purple-500 hover:text-purple-400 hover:bg-purple-500/10"
-                                                onClick={() => handleViewOrder(order)}
-                                            >
-                                                <ShoppingCart className="h-4 w-4" />
-                                                <span className="sr-only">View order {order.id}</span>
-                                            </Button>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        <span className="sr-only">Open menu</span>
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="bg-zinc-800 border-zinc-700">
-                                                    <DropdownMenuItem
-                                                        className="cursor-pointer text-white"
-                                                        onClick={() => handleEditOrder(order)}
-                                                    >
-                                                        Edit order
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem className="cursor-pointer text-white">
-                                                        <Download className="h-4 w-4 mr-2" />
-                                                        Export
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        className="cursor-pointer text-red-500"
-                                                        onClick={() => handleCancelOrder(order)}
-                                                    >
-                                                        Cancel order
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+            <OrderTable
+                orders={filteredOrders}
+                onViewOrder={handleViewOrder}
+                onCancelOrder={handleCancelOrder}
+                formatDate={formatDate}
+            />
 
             {/* Order Details Dialog */}
             <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
                 <DialogContent className="sm:max-w-[600px] bg-zinc-900 border-zinc-800">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-white">Order Details</h2>
-                        {/* <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full"
-                            onClick={() => setOrderDialogOpen(false)}
-                        >
-                            <X className="h-4 w-4" />
-                        </Button> */}
                     </div>
                     {selectedOrder && (
                         <div className="space-y-6">
@@ -675,7 +464,17 @@ export default function CommandesPage() {
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-zinc-400">Status:</span>
-                                            <Badge variant="outline" className={getPaymentStatusColor(selectedOrder.paymentStatus)}>
+                                            <Badge
+                                                variant="outline"
+                                                className={`px-2 py-1 rounded-full text-xs ${selectedOrder.paymentStatus === "Paid"
+                                                        ? "bg-green-500/20 text-green-500"
+                                                        : selectedOrder.paymentStatus === "Pending"
+                                                            ? "bg-yellow-500/20 text-yellow-500"
+                                                            : selectedOrder.paymentStatus === "Refunded"
+                                                                ? "bg-red-500/20 text-red-500"
+                                                                : "bg-zinc-500/20 text-zinc-400"
+                                                    }`}
+                                            >
                                                 {selectedOrder.paymentStatus}
                                             </Badge>
                                         </div>
@@ -699,36 +498,38 @@ export default function CommandesPage() {
                             <div>
                                 <h3 className="text-sm font-medium text-zinc-400 mb-2">Order Items</h3>
                                 <div className="border rounded-md border-zinc-800">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="border-zinc-800">
-                                                <TableHead>Item</TableHead>
-                                                <TableHead className="text-right">Quantity</TableHead>
-                                                <TableHead className="text-right">Price</TableHead>
-                                                <TableHead className="text-right">Subtotal</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {selectedOrder.items.map((item, index) => (
-                                                <TableRow key={index} className="border-zinc-800">
-                                                    <TableCell className="text-white">{item.name}</TableCell>
-                                                    <TableCell className="text-right text-white">{item.quantity}</TableCell>
-                                                    <TableCell className="text-right text-white">{item.price}</TableCell>
-                                                    <TableCell className="text-right text-white">
-                                                        {`${(
-                                                            Number.parseFloat(item.price.replace(/[^0-9.-]+/g, "")) * item.quantity
-                                                        ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                            <TableRow className="border-zinc-800 font-medium">
-                                                <TableCell colSpan={3} className="text-right text-white">
-                                                    Total:
-                                                </TableCell>
-                                                <TableCell className="text-right text-white">{selectedOrder.total}</TableCell>
-                                            </TableRow>
-                                        </TableBody>
-                                    </Table>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr className="border-b border-zinc-800">
+                                                    <th className="text-left p-3 text-zinc-400 font-medium">Item</th>
+                                                    <th className="text-right p-3 text-zinc-400 font-medium">Quantity</th>
+                                                    <th className="text-right p-3 text-zinc-400 font-medium">Price</th>
+                                                    <th className="text-right p-3 text-zinc-400 font-medium">Subtotal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {selectedOrder.items.map((item, index) => (
+                                                    <tr key={index} className="border-b border-zinc-800">
+                                                        <td className="p-3 text-white">{item.name}</td>
+                                                        <td className="p-3 text-right text-white">{item.quantity}</td>
+                                                        <td className="p-3 text-right text-white">{item.price}</td>
+                                                        <td className="p-3 text-right text-white">
+                                                            {`${(
+                                                                Number.parseFloat(item.price.replace(/[^0-9.-]+/g, "")) * item.quantity
+                                                            ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                <tr className="border-b border-zinc-800 font-medium">
+                                                    <td colSpan={3} className="p-3 text-right text-white">
+                                                        Total:
+                                                    </td>
+                                                    <td className="p-3 text-right text-white">{selectedOrder.total}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex justify-end gap-3">
@@ -742,107 +543,6 @@ export default function CommandesPage() {
                             </div>
                         </div>
                     )}
-                </DialogContent>
-            </Dialog>
-
-            {/* Edit Order Dialog */}
-            <Dialog
-                open={editOrderDialogOpen}
-                onOpenChange={(open) => {
-                    setEditOrderDialogOpen(open)
-                    if (!open) {
-                        resetOrderForm()
-                        setOrderToEdit(null)
-                    }
-                }}
-            >
-                <DialogContent className="sm:max-w-[500px] bg-zinc-900 border-zinc-800 p-0">
-                    <div className="p-6 space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-semibold text-white">Edit Order</h2>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <Label htmlFor="customer" className="mb-2 block text-white">
-                                        Customer
-                                    </Label>
-                                    <Select value={customerId} onValueChange={setCustomerId}>
-                                        <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
-                                            <SelectValue placeholder="Select customer" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-zinc-800 border-zinc-700">
-                                            {customers.map((customer) => (
-                                                <SelectItem key={customer.id} value={customer.id}>
-                                                    {customer.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <Label htmlFor="agent" className="mb-2 block text-white">
-                                        Agent
-                                    </Label>
-                                    <Select value={agentId} onValueChange={setAgentId}>
-                                        <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
-                                            <SelectValue placeholder="Select agent" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-zinc-800 border-zinc-700">
-                                            {agents.map((agent) => (
-                                                <SelectItem key={agent.id} value={agent.id}>
-                                                    {agent.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <OrderItemsEditor
-                                products={products}
-                                orderItems={orderItems}
-                                onAddItem={addOrderItem}
-                                onRemoveItem={removeOrderItem}
-                                onUpdateItem={updateOrderItem}
-                                getProductPrice={getProductPrice}
-                                formatPrice={formatPrice}
-                            />
-
-                            <div className="grid grid-cols-1 gap-6">
-                                <div>
-                                    <Label htmlFor="payment" className="mb-2 block text-white">
-                                        Payment Status
-                                    </Label>
-                                    <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-                                        <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
-                                            <SelectValue placeholder="Pending" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-zinc-800 border-zinc-700">
-                                            <SelectItem value="Pending">Pending</SelectItem>
-                                            <SelectItem value="Paid">Paid</SelectItem>
-                                            <SelectItem value="Refunded">Refunded</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-between items-center">
-                                <div className="text-zinc-400 font-medium">Total:</div>
-                                <div className="text-xl font-bold text-white">{calculateTotal()}</div>
-                            </div>
-
-                            <div className="flex justify-end gap-3 pt-4">
-                                <Button variant="outline" onClick={() => setEditOrderDialogOpen(false)} className="text-black">
-                                    Cancel
-                                </Button>
-                                <Button className="bg-purple-600 hover:bg-purple-700" onClick={handleUpdateOrder}>
-                                    Update Order
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
                 </DialogContent>
             </Dialog>
 
@@ -867,4 +567,3 @@ export default function CommandesPage() {
         </div>
     )
 }
-

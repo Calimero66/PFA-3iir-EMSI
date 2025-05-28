@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { LayoutDashboard, LogOut, Package, Users, TrendingUp, BarChart, ShoppingCart } from "lucide-react"
+import { LayoutDashboard, LogOut, Package, Users, TrendingUp, BarChart, ShoppingCart, ListPlus } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -39,13 +39,13 @@ export function Sidebar() {
         },
         {
             label: "Suppliers",
-            icon: Package,
+            icon: Users,
             to: "/suppliers",
             active: pathname === "/suppliers",
         },
         {
             label: "Categories",
-            icon: Package,
+            icon: ListPlus,
             to: "/categories",
             active: pathname === "/categories",
         },

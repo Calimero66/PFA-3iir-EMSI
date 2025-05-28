@@ -1,3 +1,5 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -33,12 +35,7 @@ export default function OrderItemsEditor({
         <div>
             <div className="flex justify-between items-center mb-4">
                 <Label>Order Items</Label>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 bg-zinc-800 border-zinc-700 text-white"
-                    onClick={onAddItem}
-                >
+                <Button variant="outline" size="sm" className="h-8 bg-zinc-800 border-zinc-700 text-white" onClick={onAddItem}>
                     <Plus className="h-3.5 w-3.5 mr-1" />
                     Add Item
                 </Button>
@@ -50,10 +47,7 @@ export default function OrderItemsEditor({
                         <Label htmlFor={`product-${index}`} className="mb-2 block">
                             Product
                         </Label>
-                        <Select
-                            value={item.productId}
-                            onValueChange={(value) => onUpdateItem(index, "productId", value)}
-                        >
+                        <Select value={item.productId} onValueChange={(value) => onUpdateItem(index, "productId", value)}>
                             <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
                                 <SelectValue placeholder="Select product" />
                             </SelectTrigger>
@@ -105,5 +99,5 @@ export default function OrderItemsEditor({
                 </div>
             ))}
         </div>
-    );
+    )
 }
