@@ -16,10 +16,10 @@ export function Sidebar() {
             active: pathname === "/dashboard",
         },
         {
-            label: "Stock",
+            label: "Articles",
             icon: Package,
-            to: "/stock",
-            active: pathname === "/stock",
+            to: "/articles",
+            active: pathname === "/articles",
         },
         {
             label: "Users",
@@ -34,8 +34,8 @@ export function Sidebar() {
         }, {
             label: "Orders",
             icon: ShoppingCart,
-            to: "/commandes",
-            active: pathname === "/commandes",
+            to: "/Orders",
+            active: pathname === "/Orders",
         },
         {
             label: "Suppliers",

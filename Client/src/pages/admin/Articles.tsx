@@ -3,14 +3,14 @@ import { Trash2, PencilLine } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { StockDialog } from "@/components/stock/stock-dialog"
+import { ArticleDialog } from "@/components/articles-dialog"
 import api from "@/lib/api"
 
-interface StockItem {
+interface ArticleItem {
     id: number
     barcode: string
     name: string
-    price: number | string  // Handle both formats
+    price: number | string
     quantity: number
     category_id: number
     supplier_id: number
@@ -32,7 +32,7 @@ interface StockItem {
     updated_at: string
 }
 
-interface StockFormData {
+interface ArticleFormData {
     barcode: string
     name: string
     price: string
@@ -42,46 +42,46 @@ interface StockFormData {
     notes: string
 }
 
-export default function StockPage() {
-    const [stockItems, setStockItems] = useState<StockItem[]>([])
+export default function ArticlesPage() {
+    const [articleItem, setArticleItem] = useState<ArticleItem[]>([])
     const [loading, setLoading] = useState(true)
     const [isEditing, setIsEditing] = useState(false)
     const [editingId, setEditingId] = useState<number | null>(null)
-    const [initialFormData, setInitialFormData] = useState<StockFormData | undefined>(undefined)
+    const [initialFormData, setInitialFormData] = useState<ArticleFormData | undefined>(undefined)
 
     useEffect(() => {
-        fetchStockItems()
+        fetcharticleItems()
     }, [])
 
-    const fetchStockItems = async () => {
+    const fetcharticleItems = async () => {
         try {
             setLoading(true)
             const response = await api.get("/articles")
-            console.log("🚀 ~ fetchStockItems ~ response:", response)
+            console.log("🚀 ~ fetcharticleItems ~ response:", response)
             
             // Ensure we're setting an array to state
             if (Array.isArray(response.data)) {
-                setStockItems(response.data)
+                setArticleItem(response.data)
             } else if (response.data && typeof response.data === 'object') {
                 // If response.data is an object that might contain the array
                 // Check common API response patterns
                 const items = response.data.articles || response.data.data || response.data.items || []
-                setStockItems(items)
+                setArticleItem(items)
             } else {
                 // Fallback to empty array if data format is unexpected
                 console.error("Unexpected API response format:", response.data)
-                setStockItems([])
+                setArticleItem([])
             }
         } catch (error) {
-            console.error("Error fetching stock items:", error)
-            setStockItems([]) // Ensure we reset to empty array on error
+            console.error("Error fetching article items:", error)
+            setArticleItem([]) // Ensure we reset to empty array on error
         } finally {
             setLoading(false)
         }
     }
 
-    const addStock = async (
-        formData: StockFormData,
+    const addArticle = async (
+        formData: ArticleFormData,
         isEditing: boolean,
         editingId: number | null,
         categoryName: string,
@@ -103,7 +103,7 @@ export default function StockPage() {
                 await api.put(`/articles/${editingId}`, payload)
 
                 // Update the item in local state with nested objects
-                setStockItems((prev) =>
+                setArticleItem((prev) =>
                     prev.map((item) =>
                         item.id === editingId
                             ? {
@@ -125,7 +125,7 @@ export default function StockPage() {
                 // Create new item
                 const response = await api.post("/articles", payload)
                 // The response now contains nested category and supplier
-                setStockItems((prev) => [...prev, response.data])
+                setArticleItem((prev) => [...prev, response.data])
             }
 
             // Reset editing state
@@ -133,12 +133,12 @@ export default function StockPage() {
             setEditingId(null)
             setInitialFormData(undefined)
         } catch (error) {
-            console.error("Error saving stock item:", error)
+            console.error("Error saving article item:", error)
         }
     }
 
     const handleEdit = (id: number) => {
-        const item = stockItems.find((item) => item.id === id)
+        const item = articleItem.find((item) => item.id === id)
         if (item) {
             setIsEditing(true)
             setEditingId(id)
@@ -158,9 +158,9 @@ export default function StockPage() {
         if (window.confirm("Are you sure you want to delete this item?")) {
             try {
                 await api.delete(`/articles/${id}`)
-                setStockItems((prev) => prev.filter((item) => item.id !== id))
+                setArticleItem((prev) => prev.filter((item) => item.id !== id))
             } catch (error) {
-                console.error("Error deleting stock item:", error)
+                console.error("Error deleting article item:", error)
             }
         }
     }
@@ -170,7 +170,7 @@ export default function StockPage() {
             <div className="min-h-screen bg-zinc-950 text-white">
                 <div className="p-6 space-y-6">
                     <div className="flex justify-center items-center h-64">
-                        <div className="text-zinc-400">Loading stock items...</div>
+                        <div className="text-zinc-400">Loading article items...</div>
                     </div>
                 </div>
             </div>
@@ -182,29 +182,29 @@ export default function StockPage() {
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-2xl font-bold text-white">Stock Management</h1>
+                        <h1 className="text-2xl font-bold text-white">Article Management</h1>
                         <p className="text-zinc-400">Manage your inventory items</p>
                     </div>
 
-                    <StockDialog
+                    <ArticleDialog
                         isEditing={isEditing}
                         editingId={editingId}
                         initialFormData={initialFormData}
-                        onSubmit={addStock}
+                        onSubmit={addArticle}
                     />
                 </div>
 
                 <Card className="bg-zinc-900 border-zinc-800">
                     <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle className="text-white">Stock Items</CardTitle>
+                        <CardTitle className="text-white">Article Items</CardTitle>
                         <div className="text-sm text-zinc-400">
-                            {stockItems.length} {stockItems.length === 1 ? "item" : "items"} in inventory
+                            {articleItem.length} {articleItem.length === 1 ? "item" : "items"} in inventory
                         </div>
                     </CardHeader>
                     <CardContent>
-                        {stockItems.length === 0 ? (
+                        {articleItem.length === 0 ? (
                             <div className="text-center py-6 text-zinc-500">
-                                <p>No stock items found. Add your first item to get started.</p>
+                                <p>No article items found. Add your first item to get started.</p>
                             </div>
                         ) : (
                             <Table>
@@ -223,7 +223,7 @@ export default function StockPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {stockItems.map((item) => (
+                                    {articleItem.map((item) => (
                                         <TableRow key={item.id} className="border-zinc-800">
                                             <TableCell className="text-zinc-300">{item.barcode}</TableCell>
                                             <TableCell className="text-zinc-300 font-medium">{item.name}</TableCell>

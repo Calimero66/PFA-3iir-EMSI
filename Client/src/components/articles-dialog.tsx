@@ -22,7 +22,7 @@ interface Supplier {
     name: string
 }
 
-interface StockDialogProps {
+interface ArticleDialogProps {
     isEditing: boolean
     editingId: number | null
     onSubmit: (
@@ -51,7 +51,7 @@ interface StockDialogProps {
     }
 }
 
-export function StockDialog({ isEditing, editingId, onSubmit, initialFormData }: StockDialogProps) {
+export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData }: ArticleDialogProps) {
     // State for dialog
     const [open, setOpen] = useState(false)
     const [step, setStep] = useState(1)
@@ -203,7 +203,7 @@ export function StockDialog({ isEditing, editingId, onSubmit, initialFormData }:
                 onClick={() => setOpen(true)}
             >
                 <Plus className="mr-2 h-4 w-4" />
-                Add Stock
+                Add Article
             </Button>
             
             {open && (
@@ -219,11 +219,11 @@ export function StockDialog({ isEditing, editingId, onSubmit, initialFormData }:
                             <DialogTitle className="text-white">
                                 {isEditing
                                     ? step === 1
-                                        ? "Edit Stock - Step 1"
-                                        : "Edit Stock - Step 2"
+                                        ? "Edit article - Step 1"
+                                        : "Edit article - Step 2"
                                     : step === 1
-                                        ? "Add New Stock - Step 1"
-                                        : "Add New Stock - Step 2"}
+                                        ? "Add New article - Step 1"
+                                        : "Add New article - Step 2"}
                             </DialogTitle>
                         </DialogHeader>
 

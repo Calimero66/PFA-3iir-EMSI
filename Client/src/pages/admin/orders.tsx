@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from "react"
 import { Calendar, Download, MoreHorizontal, Plus, ShoppingCart, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -9,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
@@ -23,12 +20,19 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import OrderItemsEditor from "@/components/OrderItemsEditor"
 
 // Define types
 type OrderItem = {
     name: string
     quantity: number
     price: string
+}
+
+type Product = {
+    id: string
+    name: string
+    price: number
 }
 
 type Order = {
@@ -259,7 +263,7 @@ export default function CommandesPage() {
         }
     }
 
-    const updateOrderItem = (index: number, field: keyof NewOrderItem, value: string | number) => {
+    const updateOrderItem = (index: number, field: string, value: string | number) => {
         const newItems = [...orderItems]
         newItems[index] = { ...newItems[index], [field]: value }
         setOrderItems(newItems)
@@ -440,14 +444,6 @@ export default function CommandesPage() {
                         <div className="p-6 space-y-6">
                             <div className="flex justify-between items-center">
                                 <h2 className="text-xl font-semibold text-white">Create New Order</h2>
-                                {/* <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-full"
-                                    onClick={() => setNewOrderDialogOpen(false)}
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button> */}
                             </div>
 
                             <div className="space-y-6">
@@ -488,81 +484,15 @@ export default function CommandesPage() {
                                     </div>
                                 </div>
 
-                                <div>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <Label>Order Items</Label>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-8 bg-zinc-800 border-zinc-700 text-white"
-                                            onClick={addOrderItem}
-                                        >
-                                            <Plus className="h-3.5 w-3.5 mr-1" />
-                                            Add Item
-                                        </Button>
-                                    </div>
-
-                                    {orderItems.map((item, index) => (
-                                        <div key={index} className="grid grid-cols-[1fr_80px_100px_30px] gap-4 items-end mb-4">
-                                            <div>
-                                                <Label htmlFor={`product-${index}`} className="mb-2 block">
-                                                    Product
-                                                </Label>
-                                                <Select
-                                                    value={item.productId}
-                                                    onValueChange={(value) => updateOrderItem(index, "productId", value)}
-                                                >
-                                                    <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
-                                                        <SelectValue placeholder="Select product" />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="bg-zinc-800 border-zinc-700">
-                                                        {products.map((product) => (
-                                                            <SelectItem key={product.id} value={product.id}>
-                                                                {product.name}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div>
-                                                <Label htmlFor={`quantity-${index}`} className="mb-2 block">
-                                                    Qty
-                                                </Label>
-                                                <Input
-                                                    id={`quantity-${index}`}
-                                                    type="number"
-                                                    value={item.quantity}
-                                                    onChange={(e) => updateOrderItem(index, "quantity", Number.parseInt(e.target.value) || 1)}
-                                                    min="1"
-                                                    className="bg-zinc-800 border-zinc-700"
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label htmlFor={`price-${index}`} className="mb-2 block">
-                                                    Price
-                                                </Label>
-                                                <Input
-                                                    id={`price-${index}`}
-                                                    value={formatPrice(getProductPrice(item.productId))}
-                                                    readOnly
-                                                    className="bg-zinc-800 border-zinc-700"
-                                                />
-                                            </div>
-                                            <div className="flex items-end">
-                                                {orderItems.length > 1 && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-10 w-10 text-zinc-400"
-                                                        onClick={() => removeOrderItem(index)}
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                <OrderItemsEditor
+                                    products={products}
+                                    orderItems={orderItems}
+                                    onAddItem={addOrderItem}
+                                    onRemoveItem={removeOrderItem}
+                                    onUpdateItem={updateOrderItem}
+                                    getProductPrice={getProductPrice}
+                                    formatPrice={formatPrice}
+                                />
 
                                 <div className="grid grid-cols-1 gap-6">
                                     <div>
@@ -830,14 +760,6 @@ export default function CommandesPage() {
                     <div className="p-6 space-y-6">
                         <div className="flex justify-between items-center">
                             <h2 className="text-xl font-semibold text-white">Edit Order</h2>
-                            {/* <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 rounded-full"
-                                onClick={() => setEditOrderDialogOpen(false)}
-                            >
-                                <X className="h-4 w-4" />
-                            </Button> */}
                         </div>
 
                         <div className="space-y-6">
@@ -878,81 +800,15 @@ export default function CommandesPage() {
                                 </div>
                             </div>
 
-                            <div>
-                                <div className="flex justify-between items-center mb-4">
-                                    <Label>Order Items</Label>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-8 bg-zinc-800 border-zinc-700 text-white"
-                                        onClick={addOrderItem}
-                                    >
-                                        <Plus className="h-3.5 w-3.5 mr-1" />
-                                        Add Item
-                                    </Button>
-                                </div>
-
-                                {orderItems.map((item, index) => (
-                                    <div key={index} className="grid grid-cols-[1fr_80px_100px_30px] gap-4 items-end mb-4">
-                                        <div>
-                                            <Label htmlFor={`product-${index}`} className="mb-2 block">
-                                                Product
-                                            </Label>
-                                            <Select
-                                                value={item.productId}
-                                                onValueChange={(value) => updateOrderItem(index, "productId", value)}
-                                            >
-                                                <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
-                                                    <SelectValue placeholder="Select product" />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-zinc-800 border-zinc-700">
-                                                    {products.map((product) => (
-                                                        <SelectItem key={product.id} value={product.id}>
-                                                            {product.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div>
-                                            <Label htmlFor={`quantity-${index}`} className="mb-2 block">
-                                                Qty
-                                            </Label>
-                                            <Input
-                                                id={`quantity-${index}`}
-                                                type="number"
-                                                value={item.quantity}
-                                                onChange={(e) => updateOrderItem(index, "quantity", Number.parseInt(e.target.value) || 1)}
-                                                min="1"
-                                                className="bg-zinc-800 border-zinc-700"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label htmlFor={`price-${index}`} className="mb-2 block">
-                                                Price
-                                            </Label>
-                                            <Input
-                                                id={`price-${index}`}
-                                                value={formatPrice(getProductPrice(item.productId))}
-                                                readOnly
-                                                className="bg-zinc-800 border-zinc-700"
-                                            />
-                                        </div>
-                                        <div className="flex items-end">
-                                            {orderItems.length > 1 && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-10 w-10 text-zinc-400"
-                                                    onClick={() => removeOrderItem(index)}
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                            <OrderItemsEditor
+                                products={products}
+                                orderItems={orderItems}
+                                onAddItem={addOrderItem}
+                                onRemoveItem={removeOrderItem}
+                                onUpdateItem={updateOrderItem}
+                                getProductPrice={getProductPrice}
+                                formatPrice={formatPrice}
+                            />
 
                             <div className="grid grid-cols-1 gap-6">
                                 <div>
@@ -1011,3 +867,4 @@ export default function CommandesPage() {
         </div>
     )
 }
+

@@ -2,20 +2,28 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class OrderLine extends Model
 {
-    
-    protected $fillable = ['order_id', 'quantity'];
-    
+    use HasFactory;
+
+    protected $fillable = [
+        'order_id',
+        'article_id',
+        'quantity',
+        'unit_price',
+        'line_total',
+    ];
+
     public function order()
     {
         return $this->belongsTo(Order::class);
     }
 
-    public function report()
+    public function article()
     {
-        return $this->hasOne(Report::class);
+        return $this->belongsTo(Article::class);
     }
 }
