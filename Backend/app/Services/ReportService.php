@@ -152,10 +152,129 @@ class ReportService
             'order_line' => $report->orderLine ? [
                 'id' => $report->orderLine->id,
                 'quantity' => $report->orderLine->quantity,
-                'price' => $report->orderLine->price,
+                'unit_price' => $report->orderLine->unit_price,
+                'line_total' => $report->orderLine->line_total,
             ] : null,
         ];
 
         return $ticket;
+    }
+
+    /**
+     * Get sales reports with date range filtering
+     *
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getSalesReportsByDateRange(?string $startDate = null, ?string $endDate = null)
+    {
+        $query = Report::with(['user', 'stockMovement.article.category', 'supplier', 'orderLine.order'])
+            ->where('type', 'sale')
+            ->orderBy('report_date', 'desc');
+
+        if ($startDate) {
+            $query->where('report_date', '>=', $startDate);
+        }
+
+        if ($endDate) {
+            $query->where('report_date', '<=', $endDate);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Get detailed sales summary for a date range
+     *
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @return array
+     */
+    public function getSalesSummary(?string $startDate = null, ?string $endDate = null): array
+    {
+        $salesReports = $this->getSalesReportsByDateRange($startDate, $endDate);
+
+        $totalRevenue = 0;
+        $totalQuantitySold = 0;
+        $totalOrders = 0;
+        $itemsSold = [];
+        $categorySales = [];
+        $orderIds = [];
+
+        foreach ($salesReports as $report) {
+            if ($report->orderLine) {
+                $orderLine = $report->orderLine;
+                $article = $report->stockMovement->article;
+
+                // Track unique orders
+                if (!in_array($orderLine->order_id, $orderIds)) {
+                    $orderIds[] = $orderLine->order_id;
+                    $totalOrders++;
+                }
+
+                // Revenue and quantity
+                $totalRevenue += $orderLine->line_total;
+                $totalQuantitySold += $orderLine->quantity;
+
+                // Items sold tracking
+                $articleId = $article->id;
+                if (!isset($itemsSold[$articleId])) {
+                    $itemsSold[$articleId] = [
+                        'article_id' => $articleId,
+                        'article_name' => $article->name,
+                        'article_barcode' => $article->barcode,
+                        'category' => $article->category?->name ?? 'Uncategorized',
+                        'total_quantity' => 0,
+                        'total_revenue' => 0,
+                        'unit_price' => $orderLine->unit_price,
+                    ];
+                }
+
+                $itemsSold[$articleId]['total_quantity'] += $orderLine->quantity;
+                $itemsSold[$articleId]['total_revenue'] += $orderLine->line_total;
+
+                // Category sales tracking
+                $categoryName = $article->category?->name ?? 'Uncategorized';
+                if (!isset($categorySales[$categoryName])) {
+                    $categorySales[$categoryName] = [
+                        'category_name' => $categoryName,
+                        'total_quantity' => 0,
+                        'total_revenue' => 0,
+                        'items_count' => 0,
+                    ];
+                }
+
+                $categorySales[$categoryName]['total_quantity'] += $orderLine->quantity;
+                $categorySales[$categoryName]['total_revenue'] += $orderLine->line_total;
+                $categorySales[$categoryName]['items_count']++;
+            }
+        }
+
+        // Sort items by revenue (top sellers)
+        uasort($itemsSold, function($a, $b) {
+            return $b['total_revenue'] <=> $a['total_revenue'];
+        });
+
+        // Sort categories by revenue
+        uasort($categorySales, function($a, $b) {
+            return $b['total_revenue'] <=> $a['total_revenue'];
+        });
+
+        return [
+            'summary' => [
+                'total_revenue' => round($totalRevenue, 2),
+                'total_quantity_sold' => $totalQuantitySold,
+                'total_orders' => $totalOrders,
+                'average_order_value' => $totalOrders > 0 ? round($totalRevenue / $totalOrders, 2) : 0,
+                'date_range' => [
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                ],
+            ],
+            'items_sold' => array_values($itemsSold),
+            'category_sales' => array_values($categorySales),
+            'top_selling_items' => array_slice(array_values($itemsSold), 0, 10),
+        ];
     }
 }

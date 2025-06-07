@@ -68,6 +68,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('reports/{id}/ticket', [ReportController::class, 'generateTicket']);
     Route::get('reports/{id}', [ReportController::class, 'show']);
 
+    // Sales Analytics routes
+    Route::get('reports/sales/list', [ReportController::class, 'getSalesReports']);
+    Route::get('reports/sales/summary', [ReportController::class, 'getSalesSummary']);
+    Route::get('reports/sales/analytics', [ReportController::class, 'getSalesAnalytics']);
+    Route::get('reports/sales/daily', [ReportController::class, 'getDailySalesData']);
+    Route::get('reports/sales/top-products', [ReportController::class, 'getTopSellingProducts']);
+    Route::get('reports/sales/item/{articleId}', [ReportController::class, 'getItemSalesReport']);
+
     // Order routes
     Route::post('orders/sell', [OrderController::class, 'sellArticle']);
     Route::apiResource('orders', OrderController::class);

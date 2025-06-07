@@ -36,4 +36,10 @@ class Report extends Model
     {
         return $this->belongsTo(OrderLine::class);
     }
+
+    // Helper relationship to get the order through the order line
+    public function order()
+    {
+        return $this->hasOneThrough(Order::class, OrderLine::class, 'id', 'id', 'order_line_id', 'order_id');
+    }
 }

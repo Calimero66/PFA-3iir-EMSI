@@ -25,4 +25,10 @@ class Order extends Model
     {
         return $this->hasManyThrough(Article::class, OrderLine::class, 'order_id', 'id', 'id', 'article_id');
     }
+
+    // Get all reports for this order through order lines
+    public function reports()
+    {
+        return $this->hasManyThrough(Report::class, OrderLine::class, 'order_id', 'order_line_id', 'id', 'id');
+    }
 }

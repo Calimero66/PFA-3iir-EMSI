@@ -148,9 +148,10 @@ class OrderController extends Controller
                     // Create report for this movement
                     $reportData = [
                         'user_id' => $userId,
+                        'order_line_id' => $orderLine->id, // Link the report to the specific order line
                         'details' => $request->notes ?? "Sale of article {$article->name} (Barcode: {$article->barcode})",
                     ];
-                    
+
                     $this->reportService->createStockMovementReport($stockMovement, $reportData);
                     
                     $orderLines[] = $orderLine;
