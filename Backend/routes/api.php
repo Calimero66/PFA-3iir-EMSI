@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\OrderLineController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\StockSupplyController;
 use App\Http\Controllers\SupplierController;
@@ -77,6 +78,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('reports/sales/item/{articleId}', [ReportController::class, 'getItemSalesReport']);
 
     // Order routes
+    Route::get('orders/lines', [OrderController::class, 'getOrderLines']);
+    Route::get('orders/{orderId}/lines', [OrderController::class, 'getOrderLinesByOrder']);
+    Route::get('orders/{orderId}/test-delete', [OrderController::class, 'testDelete']);
+    Route::delete('orders/multiple', [OrderController::class, 'destroyMultiple']);
     Route::post('orders/sell', [OrderController::class, 'sellArticle']);
     Route::apiResource('orders', OrderController::class);
+
+    // Order Lines routes
+    Route::post('order-lines/check-deletion-impact', [OrderLineController::class, 'checkOrderDeletionImpact']);
+    Route::delete('order-lines/multiple', [OrderLineController::class, 'destroyMultiple']);
+    Route::delete('order-lines/order/{orderId}', [OrderLineController::class, 'destroyByOrder']);
+    Route::apiResource('order-lines', OrderLineController::class);
 });

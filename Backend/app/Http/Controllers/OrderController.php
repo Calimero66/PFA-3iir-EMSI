@@ -32,7 +32,44 @@ class OrderController extends Controller
      */
     public function index()
     {
-        //
+        try {
+            $orders = Order::with(['orderLines.article', 'user'])
+                ->withCount('orderLines')
+                ->get()
+                ->map(function ($order) {
+                    // Calculate total items count (sum of all quantities)
+                    $totalItems = $order->orderLines->sum('quantity');
+
+                    return [
+                        'id' => $order->id,
+                        'user' => $order->user ? $order->user->name : 'Unknown',
+                        'total_amount' => $order->total_amount,
+                        'total_items' => $totalItems,
+                        'number_of_different_articles' => $order->order_lines_count,
+                        'created_at' => $order->created_at,
+                        'order_lines' => $order->orderLines->map(function ($line) {
+                            return [
+                                'id' => $line->id,
+                                'article_name' => $line->article->name,
+                                'quantity' => $line->quantity,
+                                'unit_price' => $line->unit_price,
+                                'line_total' => $line->line_total,
+                            ];
+                        })
+                    ];
+                });
+
+            return response()->json([
+                'message' => 'Orders retrieved successfully',
+                'data' => $orders
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error retrieving orders: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to retrieve orders',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -208,7 +245,320 @@ class OrderController extends Controller
      */
     public function destroy(Order $order)
     {
-        //
+        try {
+            return DB::transaction(function () use ($order) {
+                // Load the order with its order lines and articles
+                $orderWithLines = Order::with(['orderLines.article'])->find($order->id);
+
+                if (!$orderWithLines) {
+                    return response()->json([
+                        'message' => 'Order not found'
+                    ], 404);
+                }
+
+                $restoredItems = [];
+                $failedRestorations = [];
+
+                Log::info("Starting deletion of Order #{$order->id}");
+
+                // Restore stock quantities for each order line
+                foreach ($orderWithLines->orderLines as $orderLine) {
+                    $article = $orderLine->article;
+
+                    try {
+                        // Find the stock supply for this article
+                        $stockSupply = StockSupply::where('article_id', $article->id)->first();
+
+                        if ($stockSupply) {
+                            $oldQuantity = $stockSupply->quantity;
+
+                            // Add back the quantity that was sold
+                            $stockSupply->quantity += $orderLine->quantity;
+                            $stockSupply->save();
+
+                            // Create a stock movement record for the restoration
+                            StockMovement::create([
+                                'article_id' => $article->id,
+                                'type' => 'in',
+                                'quantity' => $orderLine->quantity,
+                                'date' => now(),
+                                'reason' => "Order #{$order->id} deleted - stock restored for {$article->name}",
+                            ]);
+
+                            $restoredItems[] = [
+                                'article_name' => $article->name,
+                                'article_id' => $article->id,
+                                'quantity_restored' => $orderLine->quantity,
+                                'old_stock' => $oldQuantity,
+                                'new_stock' => $stockSupply->quantity
+                            ];
+
+                            Log::info("Successfully restored {$orderLine->quantity} units of {$article->name} to stock (from {$oldQuantity} to {$stockSupply->quantity})");
+                        } else {
+                            $failedRestorations[] = [
+                                'article_name' => $article->name,
+                                'article_id' => $article->id,
+                                'quantity_to_restore' => $orderLine->quantity,
+                                'reason' => 'No stock supply record found'
+                            ];
+
+                            Log::warning("Could not restore stock for {$article->name} (ID: {$article->id}) - No stock supply record found");
+                        }
+                    } catch (\Exception $e) {
+                        $failedRestorations[] = [
+                            'article_name' => $article->name,
+                            'article_id' => $article->id,
+                            'quantity_to_restore' => $orderLine->quantity,
+                            'reason' => $e->getMessage()
+                        ];
+
+                        Log::error("Failed to restore stock for {$article->name} (ID: {$article->id}): " . $e->getMessage());
+                    }
+                }
+
+                // Delete the order (this will cascade delete order lines due to foreign key constraints)
+                $orderWithLines->delete();
+
+                Log::info("Order #{$order->id} deleted successfully");
+
+                $response = [
+                    'message' => 'Order deleted successfully',
+                    'deleted_order_id' => $order->id,
+                    'restored_items' => $restoredItems
+                ];
+
+                if (!empty($failedRestorations)) {
+                    $response['message'] = 'Order deleted, but some stock quantities could not be restored';
+                    $response['failed_restorations'] = $failedRestorations;
+                    Log::warning("Order #{$order->id} deleted but some stock restorations failed", $failedRestorations);
+                }
+
+                return response()->json($response, 200);
+            });
+        } catch (\Exception $e) {
+            Log::error('Error deleting order: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete order',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete multiple orders and restore stock quantities
+     */
+    public function destroyMultiple(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'order_ids' => 'required|array|min:1',
+            'order_ids.*' => 'required|integer|exists:orders,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            return DB::transaction(function () use ($request) {
+                $deletedOrders = [];
+                $restoredItems = [];
+
+                foreach ($request->order_ids as $orderId) {
+                    $order = Order::with(['orderLines.article'])->find($orderId);
+
+                    if (!$order) {
+                        continue; // Skip if order not found
+                    }
+
+                    // Restore stock quantities for each order line
+                    foreach ($order->orderLines as $orderLine) {
+                        $article = $orderLine->article;
+
+                        // Find the stock supply for this article
+                        $stockSupply = StockSupply::where('article_id', $article->id)->first();
+
+                        if ($stockSupply) {
+                            // Add back the quantity that was sold
+                            $stockSupply->quantity += $orderLine->quantity;
+                            $stockSupply->save();
+
+                            // Create a stock movement record for the restoration
+                            StockMovement::create([
+                                'article_id' => $article->id,
+                                'type' => 'in',
+                                'quantity' => $orderLine->quantity,
+                                'date' => now(),
+                                'reason' => "Order #{$order->id} deleted - stock restored for {$article->name}",
+                            ]);
+
+                            $restoredItems[] = [
+                                'article_name' => $article->name,
+                                'quantity_restored' => $orderLine->quantity
+                            ];
+                        }
+                    }
+
+                    // Delete the order
+                    $order->delete();
+                    $deletedOrders[] = $orderId;
+                }
+
+                return response()->json([
+                    'message' => 'Orders deleted successfully and stock quantities restored',
+                    'deleted_orders' => $deletedOrders,
+                    'restored_items' => $restoredItems
+                ], 200);
+            });
+        } catch (\Exception $e) {
+            Log::error('Error deleting multiple orders: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete orders',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Test the delete functionality - for debugging purposes
+     */
+    public function testDelete($orderId)
+    {
+        try {
+            // Get order details before deletion
+            $order = Order::with(['orderLines.article'])->find($orderId);
+
+            if (!$order) {
+                return response()->json([
+                    'message' => 'Order not found'
+                ], 404);
+            }
+
+            $beforeDeletion = [
+                'order_id' => $order->id,
+                'total_amount' => $order->total_amount,
+                'order_lines_count' => $order->orderLines->count(),
+                'order_lines' => $order->orderLines->map(function ($line) {
+                    $stockSupply = StockSupply::where('article_id', $line->article_id)->first();
+                    return [
+                        'article_id' => $line->article_id,
+                        'article_name' => $line->article->name,
+                        'quantity_sold' => $line->quantity,
+                        'current_stock' => $stockSupply ? $stockSupply->quantity : 'No stock record'
+                    ];
+                })
+            ];
+
+            // Now delete the order
+            $deleteResponse = $this->destroy($order);
+            $deleteData = json_decode($deleteResponse->getContent(), true);
+
+            return response()->json([
+                'message' => 'Delete test completed',
+                'before_deletion' => $beforeDeletion,
+                'delete_result' => $deleteData,
+                'status_code' => $deleteResponse->getStatusCode()
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error in delete test: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Delete test failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all order lines with item counts
+     */
+    public function getOrderLines()
+    {
+        try {
+            $orderLines = OrderLine::with(['order.user', 'article'])
+                ->get()
+                ->groupBy('order_id')
+                ->map(function ($lines, $orderId) {
+                    $order = $lines->first()->order;
+                    $totalItems = $lines->sum('quantity');
+
+                    return [
+                        'order_id' => $orderId,
+                        'user' => $order->user ? $order->user->name : 'Unknown',
+                        'total_amount' => $order->total_amount,
+                        'total_items' => $totalItems, // e.g., 3 milk + 2 beef = 5 items
+                        'number_of_different_articles' => $lines->count(),
+                        'created_at' => $order->created_at,
+                        'items_breakdown' => $lines->map(function ($line) {
+                            return [
+                                'article_name' => $line->article->name,
+                                'quantity' => $line->quantity,
+                                'unit_price' => $line->unit_price,
+                                'line_total' => $line->line_total,
+                            ];
+                        })->values()
+                    ];
+                });
+
+            return response()->json([
+                'message' => 'Order lines retrieved successfully',
+                'data' => $orderLines->values()
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error retrieving order lines: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to retrieve order lines',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get order lines for a specific order with item count
+     */
+    public function getOrderLinesByOrder($orderId)
+    {
+        try {
+            $order = Order::with(['orderLines.article', 'user'])->find($orderId);
+
+            if (!$order) {
+                return response()->json([
+                    'message' => 'Order not found'
+                ], 404);
+            }
+
+            $totalItems = $order->orderLines->sum('quantity');
+
+            $orderData = [
+                'order_id' => $order->id,
+                'user' => $order->user ? $order->user->name : 'Unknown',
+                'total_amount' => $order->total_amount,
+                'total_items' => $totalItems, // e.g., 3 milk + 2 beef = 5 items
+                'number_of_different_articles' => $order->orderLines->count(),
+                'created_at' => $order->created_at,
+                'items_breakdown' => $order->orderLines->map(function ($line) {
+                    return [
+                        'article_name' => $line->article->name,
+                        'quantity' => $line->quantity,
+                        'unit_price' => $line->unit_price,
+                        'line_total' => $line->line_total,
+                    ];
+                })
+            ];
+
+            return response()->json([
+                'message' => 'Order lines retrieved successfully',
+                'data' => $orderData
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Error retrieving order lines for order ' . $orderId . ': ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to retrieve order lines',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

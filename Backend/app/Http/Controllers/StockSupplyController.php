@@ -25,12 +25,37 @@ class StockSupplyController extends Controller
      */
     public function index()
     {
-        $supplies = StockSupply::with('article')
+        $supplies = StockSupply::with(['article.category', 'article.supplier'])
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Transform the data to include article name prominently
+        $transformedSupplies = $supplies->map(function ($supply) {
+            // Skip supplies with missing articles
+            if (!$supply->article) {
+                return null;
+            }
+
+            return [
+                'id' => $supply->id,
+                'article_id' => $supply->article_id,
+                'article_name' => $supply->article->name,
+                'article_barcode' => $supply->article->barcode,
+                'article_price' => $supply->article->price,
+                'category_name' => $supply->article->category?->name ?? 'Uncategorized',
+                'supplier_name' => $supply->article->supplier?->name ?? 'No Supplier',
+                'quantity' => $supply->quantity,
+                'supply_date' => $supply->supply_date,
+                'notes' => $supply->notes,
+                'created_at' => $supply->created_at,
+                'updated_at' => $supply->updated_at,
+                // Include full article object for backward compatibility
+                'article' => $supply->article
+            ];
+        })->filter(); // Remove null entries
+
         return response()->json([
-            'data' => $supplies
+            'data' => $transformedSupplies
         ]);
     }
 
@@ -75,9 +100,35 @@ class StockSupplyController extends Controller
 
             $supply = $this->stockService->addSupply($data);
 
+            // Load relationships and format response
+            $supply->load(['article.category', 'article.supplier']);
+
+            // Check if article exists
+            if (!$supply->article) {
+                return response()->json([
+                    'message' => 'Article not found for this stock supply'
+                ], 404);
+            }
+
+            $formattedSupply = [
+                'id' => $supply->id,
+                'article_id' => $supply->article_id,
+                'article_name' => $supply->article->name,
+                'article_barcode' => $supply->article->barcode,
+                'article_price' => $supply->article->price,
+                'category_name' => $supply->article->category?->name ?? 'Uncategorized',
+                'supplier_name' => $supply->article->supplier?->name ?? 'No Supplier',
+                'quantity' => $supply->quantity,
+                'supply_date' => $supply->supply_date,
+                'notes' => $supply->notes,
+                'created_at' => $supply->created_at,
+                'updated_at' => $supply->updated_at,
+                'article' => $supply->article
+            ];
+
             return response()->json([
                 'message' => 'Stock supply added or updated successfully',
-                'data' => $supply->load('article')
+                'data' => $formattedSupply
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -90,10 +141,44 @@ class StockSupplyController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(StockSupply $stockSupply)
+    public function show($id)
     {
+        // Find the stock supply manually
+        $stock_supply = StockSupply::with(['article.category', 'article.supplier'])->find($id);
+
+        if (!$stock_supply) {
+            return response()->json([
+                'message' => 'Stock supply not found'
+            ], 404);
+        }
+
+
+
+        // Check if article exists
+        if (!$stock_supply->article) {
+            return response()->json([
+                'message' => 'Article not found for this stock supply'
+            ], 404);
+        }
+
+        $formattedSupply = [
+            'id' => $stock_supply->id,
+            'article_id' => $stock_supply->article_id,
+            'article_name' => $stock_supply->article->name,
+            'article_barcode' => $stock_supply->article->barcode,
+            'article_price' => $stock_supply->article->price,
+            'category_name' => $stock_supply->article->category?->name ?? 'Uncategorized',
+            'supplier_name' => $stock_supply->article->supplier?->name ?? 'No Supplier',
+            'quantity' => $stock_supply->quantity,
+            'supply_date' => $stock_supply->supply_date,
+            'notes' => $stock_supply->notes,
+            'created_at' => $stock_supply->created_at,
+            'updated_at' => $stock_supply->updated_at,
+            'article' => $stock_supply->article
+        ];
+
         return response()->json([
-            'data' => $stockSupply->load('article')
+            'data' => $formattedSupply
         ]);
     }
 
@@ -123,7 +208,7 @@ class StockSupplyController extends Controller
     public function getArticleSupplies($articleId)
     {
         // Check if article exists
-        $article = Article::find($articleId);
+        $article = Article::with(['category', 'supplier'])->find($articleId);
         if (!$article) {
             return response()->json([
                 'message' => 'Article not found'
@@ -132,10 +217,36 @@ class StockSupplyController extends Controller
 
         $supplies = $this->stockService->getArticleSupplies($articleId);
 
+        // Transform supplies to include article name for consistency
+        $transformedSupplies = $supplies->map(function ($supply) use ($article) {
+            return [
+                'id' => $supply->id,
+                'article_id' => $supply->article_id,
+                'article_name' => $article->name,
+                'article_barcode' => $article->barcode,
+                'article_price' => $article->price,
+                'quantity' => $supply->quantity,
+                'supply_date' => $supply->supply_date,
+                'notes' => $supply->notes,
+                'created_at' => $supply->created_at,
+                'updated_at' => $supply->updated_at,
+            ];
+        });
+
         return response()->json([
             'data' => [
-                'article' => $article,
-                'supplies' => $supplies
+                'article' => [
+                    'id' => $article->id,
+                    'name' => $article->name,
+                    'barcode' => $article->barcode,
+                    'price' => $article->price,
+                    'current_quantity' => $article->quantity,
+                    'category_name' => $article->category?->name ?? 'Uncategorized',
+                    'supplier_name' => $article->supplier?->name ?? 'No Supplier',
+                ],
+                'supplies' => $transformedSupplies,
+                'total_supplies' => $supplies->count(),
+                'total_quantity_supplied' => $supplies->sum('quantity')
             ]
         ]);
     }
