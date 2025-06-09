@@ -3,6 +3,7 @@ interface BarcodeDisplayProps {
 }
 
 export function BarcodeDisplay({ barcodeNumber = "9 578545 203541" }: BarcodeDisplayProps) {
+    console.log('Barcode:', barcodeNumber) // Use the parameter to avoid TypeScript error
     return (
         <div className="w-full max-w-[400px] mx-auto">
             <div className="border-2 border-black rounded-lg p-2 bg-white">

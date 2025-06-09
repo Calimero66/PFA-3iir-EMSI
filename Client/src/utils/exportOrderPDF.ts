@@ -1,0 +1,295 @@
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+
+type ItemBreakdown = {
+    article_name: string
+    quantity: number
+    unit_price: string
+    line_total: string
+}
+
+type Order = {
+    order_id: number
+    user: string
+    total_amount: string
+    total_items: number
+    number_of_different_articles: number
+    created_at: string
+    items_breakdown: ItemBreakdown[]
+}
+
+export const exportOrderToPDF = (order: Order) => {
+    try {
+        console.log('Starting PDF export for order:', order.order_id)
+
+        // Create new PDF document
+        const doc = new jsPDF()
+
+        // Set background to white for better compatibility
+        doc.setFillColor(255, 255, 255)
+        doc.rect(0, 0, 210, 297, 'F')
+    
+        // Header
+        doc.setFontSize(20)
+        doc.setTextColor(0, 0, 0) // Black text
+        doc.setFont('helvetica', 'bold')
+        doc.text('Order Details Report', 20, 30)
+
+        // Order ID and Date
+        doc.setFontSize(12)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(100, 100, 100) // Gray text
+        doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 45)
+    
+        // Order Information Section
+        doc.setFontSize(16)
+        doc.setTextColor(0, 0, 0)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Order Information', 20, 65)
+
+        // Order info details
+        doc.setFontSize(11)
+        doc.setFont('helvetica', 'normal')
+
+        const orderInfoY = 80
+        const leftCol = 20
+        const rightCol = 110
+
+        // Left column
+        doc.setTextColor(100, 100, 100)
+        doc.text('Order ID:', leftCol, orderInfoY)
+        doc.setTextColor(0, 0, 0)
+        doc.text(`#${order.order_id}`, leftCol + 35, orderInfoY)
+
+        doc.setTextColor(100, 100, 100)
+        doc.text('Date:', leftCol, orderInfoY + 12)
+        doc.setTextColor(0, 0, 0)
+        const formattedDate = new Date(order.created_at).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit'
+        })
+        doc.text(formattedDate, leftCol + 35, orderInfoY + 12)
+
+        doc.setTextColor(100, 100, 100)
+        doc.text('Total Amount:', leftCol, orderInfoY + 24)
+        doc.setTextColor(0, 0, 0)
+        const totalAmount = `$${parseFloat(order.total_amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        doc.text(totalAmount, leftCol + 35, orderInfoY + 24)
+
+        // Right column
+        doc.setTextColor(100, 100, 100)
+        doc.text('User:', rightCol, orderInfoY)
+        doc.setTextColor(0, 0, 0)
+        doc.text(order.user, rightCol + 35, orderInfoY)
+
+        doc.setTextColor(100, 100, 100)
+        doc.text('Total Items:', rightCol, orderInfoY + 12)
+        doc.setTextColor(0, 0, 0)
+        doc.text(`${order.total_items} items`, rightCol + 35, orderInfoY + 12)
+
+        doc.setTextColor(100, 100, 100)
+        doc.text('Different Articles:', rightCol, orderInfoY + 24)
+        doc.setTextColor(0, 0, 0)
+        doc.text(`${order.number_of_different_articles} articles`, rightCol + 35, orderInfoY + 24)
+    
+        // Order Lines Section
+        doc.setFontSize(16)
+        doc.setTextColor(0, 0, 0)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Order Items', 20, 125)
+
+        // Prepare table data
+        const tableData = order.items_breakdown.map(item => [
+            item.article_name,
+            item.quantity.toString(),
+            `$${parseFloat(item.unit_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            `$${parseFloat(item.line_total).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        ])
+
+        // Add total row
+        tableData.push([
+            'Total:',
+            '',
+            '',
+            totalAmount
+        ])
+
+        // Create table using autoTable
+        autoTable(doc, {
+            startY: 135,
+            head: [['Article', 'Quantity', 'Unit Price', 'Line Total']],
+            body: tableData,
+            theme: 'striped',
+            styles: {
+                fontSize: 10,
+                textColor: [0, 0, 0],
+                fillColor: [245, 245, 245]
+            },
+            headStyles: {
+                fillColor: [147, 51, 234], // Purple
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            columnStyles: {
+                0: { halign: 'left' },
+                1: { halign: 'center' },
+                2: { halign: 'right' },
+                3: { halign: 'right' }
+            },
+            margin: { left: 20, right: 20 }
+        })
+
+        // Footer
+        const pageHeight = doc.internal.pageSize.height
+        doc.setFontSize(8)
+        doc.setTextColor(100, 100, 100)
+        doc.text('Generated by Order Management System', 20, pageHeight - 20)
+        doc.text(`Order #${order.order_id} - ${order.user}`, 20, pageHeight - 10)
+
+        // Save the PDF
+        const filename = `Order_${order.order_id}_${order.user.replace(/\s+/g, '_')}.pdf`
+        console.log('Saving PDF as:', filename)
+        doc.save(filename)
+
+        console.log('PDF export completed successfully')
+
+    } catch (error) {
+        console.error('Error exporting PDF:', error)
+        alert('Failed to export PDF. Please try again.')
+    }
+}
+
+// Alternative export function using browser print
+export const exportOrderToHTML = (order: Order) => {
+    try {
+        console.log('Starting HTML export for order:', order.order_id)
+
+        const formattedDate = new Date(order.created_at).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        })
+
+        const totalAmount = parseFloat(order.total_amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Order #${order.order_id} - ${order.user}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+                .header { text-align: center; margin-bottom: 30px; }
+                .order-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+                .info-section h3 { color: #7c3aed; margin-bottom: 10px; }
+                .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+                .label { color: #666; }
+                .value { font-weight: bold; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+                th { background-color: #7c3aed; color: white; }
+                .total-row { font-weight: bold; background-color: #f5f5f5; }
+                .footer { margin-top: 30px; text-align: center; color: #666; font-size: 12px; }
+                @media print { body { margin: 0; } }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>Order Details Report</h1>
+                <p>Generated on: ${new Date().toLocaleDateString()}</p>
+            </div>
+
+            <div class="order-info">
+                <div class="info-section">
+                    <h3>Order Information</h3>
+                    <div class="info-row">
+                        <span class="label">Order ID:</span>
+                        <span class="value">#${order.order_id}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Date:</span>
+                        <span class="value">${formattedDate}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Total Amount:</span>
+                        <span class="value">$${totalAmount}</span>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>Customer Information</h3>
+                    <div class="info-row">
+                        <span class="label">User:</span>
+                        <span class="value">${order.user}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Total Items:</span>
+                        <span class="value">${order.total_items} items</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Different Articles:</span>
+                        <span class="value">${order.number_of_different_articles} articles</span>
+                    </div>
+                </div>
+            </div>
+
+            <h3>Order Items</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Article</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Line Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${order.items_breakdown.map(item => `
+                        <tr>
+                            <td>${item.article_name}</td>
+                            <td style="text-align: center;">${item.quantity}</td>
+                            <td style="text-align: right;">$${parseFloat(item.unit_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style="text-align: right;">$${parseFloat(item.line_total).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                    `).join('')}
+                    <tr class="total-row">
+                        <td colspan="3" style="text-align: right;">Total:</td>
+                        <td style="text-align: right;">$${totalAmount}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="footer">
+                <p>Generated by Order Management System</p>
+                <p>Order #${order.order_id} - ${order.user}</p>
+            </div>
+        </body>
+        </html>
+        `
+
+        // Open in new window and trigger print
+        const printWindow = window.open('', '_blank')
+        if (printWindow) {
+            printWindow.document.write(htmlContent)
+            printWindow.document.close()
+            printWindow.focus()
+
+            // Wait for content to load then print
+            setTimeout(() => {
+                printWindow.print()
+            }, 500)
+        } else {
+            alert('Please allow popups to export the order report.')
+        }
+
+        console.log('HTML export completed successfully')
+
+    } catch (error) {
+        console.error('Error exporting HTML:', error)
+        alert('Failed to export report. Please try again.')
+    }
+}

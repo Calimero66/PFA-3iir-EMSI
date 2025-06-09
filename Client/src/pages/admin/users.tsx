@@ -205,20 +205,22 @@ export default function AgentsPage() {
                                             </TableCell>
                                             <TableCell className="text-white">{new Date(agent.created_at).toLocaleDateString()}</TableCell>
                                             <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
+                                                <div className="flex justify-end gap-1">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                                        className="h-8 w-8 text-blue-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
                                                         onClick={() => handleEdit(agent.id)}
+                                                        title="Edit User"
                                                     >
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="text-zinc-400 hover:text-red-500 hover:bg-zinc-800"
+                                                        className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                                         onClick={() => handleDeleteClick(agent.id)}
+                                                        title="Delete User"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>

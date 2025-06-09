@@ -189,20 +189,22 @@ export default function CategoriesPage() {
                                             <TableCell className="text-white">{category.description || "-"}</TableCell>
                                             <TableCell className="text-white">{new Date(category.created_at).toLocaleDateString()}</TableCell>
                                             <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
+                                                <div className="flex justify-end gap-1">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                                        className="h-8 w-8 text-blue-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
                                                         onClick={() => handleEdit(category.id)}
+                                                        title="Edit Category"
                                                     >
                                                         <Pencil className="h-4 w-4" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="text-zinc-400 hover:text-red-500 hover:bg-zinc-800"
+                                                        className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                                                         onClick={() => handleDeleteClick(category.id)}
+                                                        title="Delete Category"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>

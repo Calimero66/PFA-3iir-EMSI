@@ -1,13 +1,12 @@
-import { useState } from "react"
-import { Calendar, Download, Plus } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Calendar, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+
+import api from "@/lib/api"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -18,117 +17,31 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import OrderItemsEditor from "@/components/OrderItemsEditor"
 import OrderTable from "@/components/OrderTable"
+import CreateOrderDialog from "@/components/CreateOrderDialog"
+import { exportOrderToPDF, exportOrderToHTML } from "@/utils/exportOrderPDF"
 
-// Define types
-type OrderItem = {
-    name: string
+// Types based on API response structure
+type ItemBreakdown = {
+    article_name: string
     quantity: number
-    price: string
-}
-
-type Product = {
-    id: string
-    name: string
-    price: number
+    unit_price: string
+    line_total: string
 }
 
 type Order = {
-    id: string
-    date: Date
-    customer: string
-    items: OrderItem[]
-    total: string
-    paymentStatus: string
-    agent: string
+    order_id: number
+    user: string
+    total_amount: string
+    total_items: number
+    number_of_different_articles: number
+    created_at: string
+    items_breakdown: ItemBreakdown[]
     cancelled?: boolean
 }
 
-// Sample data for orders
-const initialOrders: Order[] = [
-    {
-        id: "ORD-2023-001",
-        date: new Date("2023-04-15T10:30:00"),
-        customer: "Acme Corporation",
-        items: [
-            { name: "Laptop Computers", quantity: 5, price: "$1,299.99" },
-            { name: "Office Chairs", quantity: 10, price: "$249.99" },
-        ],
-        total: "$8,999.85",
-        paymentStatus: "Paid",
-        agent: "Jane Smith",
-    },
-    {
-        id: "ORD-2023-002",
-        date: new Date("2023-04-12T14:45:00"),
-        customer: "TechStart Inc.",
-        items: [
-            { name: "Printer Ink", quantity: 20, price: "$89.99" },
-            { name: "Office Chairs", quantity: 5, price: "$249.99" },
-        ],
-        total: "$3,049.75",
-        paymentStatus: "Pending",
-        agent: "John Doe",
-    },
-    {
-        id: "ORD-2023-003",
-        date: new Date("2023-04-10T09:15:00"),
-        customer: "Global Solutions",
-        items: [{ name: "Laptop Computers", quantity: 3, price: "$1,299.99" }],
-        total: "$3,899.97",
-        paymentStatus: "Paid",
-        agent: "Mike Johnson",
-    },
-    {
-        id: "ORD-2023-004",
-        date: new Date("2023-04-08T11:20:00"),
-        customer: "Local Business Ltd.",
-        items: [
-            { name: "Office Chairs", quantity: 15, price: "$249.99" },
-            { name: "Desk Lamps", quantity: 15, price: "$79.99" },
-        ],
-        total: "$4,949.70",
-        paymentStatus: "Paid",
-        agent: "Jane Smith",
-    },
-    {
-        id: "ORD-2023-005",
-        date: new Date("2023-04-05T16:30:00"),
-        customer: "Education Center",
-        items: [
-            { name: "Laptop Computers", quantity: 10, price: "$1,299.99" },
-            { name: "Printer Ink", quantity: 30, price: "$89.99" },
-        ],
-        total: "$15,699.60",
-        paymentStatus: "Refunded",
-        agent: "John Doe",
-    },
-]
-
-// Product data with prices
-const products = [
-    { id: "laptop", name: "Laptop Computers", price: 1299.99 },
-    { id: "chair", name: "Office Chairs", price: 249.99 },
-    { id: "ink", name: "Printer Ink", price: 89.99 },
-    { id: "lamp", name: "Desk Lamps", price: 79.99 },
-]
-
-// Customer data
-const customers = [
-    { id: "acme", name: "Acme Corporation" },
-    { id: "techstart", name: "TechStart Inc." },
-    { id: "global", name: "Global Solutions" },
-    { id: "local", name: "Local Business Ltd." },
-    { id: "education", name: "Education Center" },
-]
-
-// Agent data
-const agents = [
-    { id: "jane", name: "Jane Smith" },
-    { id: "john", name: "John Doe" },
-    { id: "mike", name: "Mike Johnson" },
-]
+// Empty initial data for testing with real API
+const initialOrders: Order[] = []
 
 // Helper function to format dates
 const formatDate = (date: Date, options: Intl.DateTimeFormatOptions = {}) => {
@@ -147,9 +60,9 @@ const formatDateForComparison = (date: Date) => {
     return date.toISOString().split("T")[0]
 }
 
-// Define a type for new order form items
-type NewOrderItem = {
-    productId: string
+// Define a type for new order form items (based on Laravel migration)
+type NewOrderLine = {
+    article_id: number
     quantity: number
 }
 
@@ -164,14 +77,30 @@ export default function CommandesPage() {
     const [orderToCancel, setOrderToCancel] = useState<Order | null>(null)
 
     // State for new order form
-    const [orderItems, setOrderItems] = useState<NewOrderItem[]>([{ productId: "", quantity: 1 }])
-    const [customerId, setCustomerId] = useState("")
-    const [agentId, setAgentId] = useState("")
+    const [orderLines, setOrderLines] = useState<NewOrderLine[]>([{ article_id: 0, quantity: 1 }])
     const [paymentStatus, setPaymentStatus] = useState("Pending")
+    const [notes, setNotes] = useState("")
+    const [orderTotal, setOrderTotal] = useState(0)
+
+    // Fetch orders from API on component mount
+    useEffect(() => {
+        const fetchOrders = async () => {
+            try {
+                const response = await api.get("/orders/lines")
+                if (response.data && response.data.data) {
+                    setOrders(response.data.data)
+                }
+            } catch (error) {
+                console.error("Error fetching orders:", error)
+            }
+        }
+
+        fetchOrders()
+    }, [])
 
     // Filter orders based on selected date
     const filteredOrders = orders.filter((order) => {
-        const dateMatch = !date || formatDateForComparison(order.date) === formatDateForComparison(date)
+        const dateMatch = !date || formatDateForComparison(new Date(order.created_at)) === formatDateForComparison(date)
         return dateMatch && !order.cancelled
     })
 
@@ -180,60 +109,146 @@ export default function CommandesPage() {
         setOrderDialogOpen(true)
     }
 
-    const handleCancelOrder = (order: Order) => {
+
+
+    const handleDeleteOrder = (order: Order) => {
         setOrderToCancel(order)
         setCancelOrderDialogOpen(true)
     }
 
-    const confirmCancelOrder = () => {
+
+
+    const confirmCancelOrder = async () => {
         if (orderToCancel) {
-            const updatedOrders = orders.map((order) =>
-                order.id === orderToCancel.id ? { ...order, cancelled: true, paymentStatus: "Refunded" } : order,
-            )
-            setOrders(updatedOrders)
-            setCancelOrderDialogOpen(false)
-            setOrderToCancel(null)
+            try {
+                console.log('Starting order deletion process for order:', orderToCancel.order_id)
+                console.log('Order items to restore:', orderToCancel.items_breakdown)
+
+                // Step 1: Restore stock quantities for each item in the order
+                let stockRestorationSuccess = true
+
+                for (const item of orderToCancel.items_breakdown) {
+                    try {
+                        console.log(`Processing item: ${item.article_name}, quantity: ${item.quantity}`)
+
+                        // Find the article in stock supplies and restore quantity
+                        const stockResponse = await api.get("/stock-supplies")
+                        console.log('Stock supplies response:', stockResponse.data)
+
+                        const stockSupplies = stockResponse.data?.data || stockResponse.data || []
+
+                        // Find the stock supply record for this article
+                        const stockItem = stockSupplies.find((supply: any) => {
+                            const supplyName = supply.article_name || supply.article?.name || supply.name
+                            console.log(`Comparing: "${supplyName}" with "${item.article_name}"`)
+                            return supplyName === item.article_name
+                        })
+
+                        if (stockItem) {
+                            console.log('Found stock item:', stockItem)
+
+                            // Calculate new quantity (restore the ordered quantity back to stock)
+                            const currentQuantity = parseInt(stockItem.quantity) || 0
+                            const restoreQuantity = parseInt(item.quantity.toString()) || 0
+                            const newQuantity = currentQuantity + restoreQuantity
+
+                            console.log(`Restoring stock: ${currentQuantity} + ${restoreQuantity} = ${newQuantity}`)
+
+                            // Update the stock supply quantity
+                            const updateData = {
+                                quantity: newQuantity,
+                                notes: `Quantity restored from deleted order #${orderToCancel.order_id}`
+                            }
+
+                            console.log('Updating stock with data:', updateData)
+                            const updateResponse = await api.put(`/stock-supplies/${stockItem.id}`, updateData)
+                            console.log('Stock update response:', updateResponse.data)
+
+                            console.log(`✅ Restored ${restoreQuantity} units of ${item.article_name} to stock`)
+                        } else {
+                            console.warn(`❌ Stock supply not found for article: ${item.article_name}`)
+                            console.log('Available stock items:', stockSupplies.map((s: any) => ({
+                                id: s.id,
+                                name: s.article_name || s.article?.name || s.name,
+                                quantity: s.quantity
+                            })))
+                            stockRestorationSuccess = false
+                        }
+                    } catch (stockError) {
+                        console.error(`❌ Error restoring stock for ${item.article_name}:`, stockError)
+                        stockRestorationSuccess = false
+                        // Continue with other items even if one fails
+                    }
+                }
+
+                // Step 2: Delete the order lines from backend
+                console.log('Deleting order lines from backend...')
+                try {
+                    const deleteResponse = await api.delete(`/order-lines/order/${orderToCancel.order_id}`)
+                    console.log('✅ Order lines deleted successfully:', deleteResponse.data)
+                } catch (deleteError: any) {
+                    console.error('❌ Error deleting order lines:', deleteError)
+                    throw new Error(`Failed to delete order lines: ${deleteError?.message || 'Unknown error'}`)
+                }
+
+                // Step 3: Remove from local state
+                console.log('Removing order from local state...')
+                const updatedOrders = orders.filter((order) => order.order_id !== orderToCancel.order_id)
+                setOrders(updatedOrders)
+                setCancelOrderDialogOpen(false)
+                setOrderToCancel(null)
+
+                console.log('✅ Order deleted successfully:', orderToCancel.order_id)
+                if (stockRestorationSuccess) {
+                    console.log('✅ All stock quantities restored successfully')
+                } else {
+                    console.log('⚠️ Some stock restoration failed - check logs above for details')
+                }
+
+            } catch (error: any) {
+                console.error('❌ Error in order deletion process:', error)
+                console.error('Error details:', {
+                    message: error?.message,
+                    response: error?.response?.data,
+                    status: error?.response?.status
+                })
+                alert(`Failed to delete order. Error: ${error?.message || 'Unknown error'}. Check console for details.`)
+            }
         }
     }
 
-    const addOrderItem = () => {
-        setOrderItems([...orderItems, { productId: "", quantity: 1 }])
+    const addOrderLine = () => {
+        setOrderLines([...orderLines, { article_id: 0, quantity: 1 }])
     }
 
-    const removeOrderItem = (index: number) => {
-        if (orderItems.length > 1) {
-            const newItems = [...orderItems]
-            newItems.splice(index, 1)
-            setOrderItems(newItems)
+    const removeOrderLine = (index: number) => {
+        if (orderLines.length > 1) {
+            const newLines = [...orderLines]
+            newLines.splice(index, 1)
+            setOrderLines(newLines)
         }
     }
 
-    const updateOrderItem = (index: number, field: string, value: string | number) => {
-        const newItems = [...orderItems]
-        newItems[index] = { ...newItems[index], [field]: value }
-        setOrderItems(newItems)
+    const updateOrderLine = (index: number, field: string, value: string | number) => {
+        const newLines = [...orderLines]
+        newLines[index] = { ...newLines[index], [field]: value }
+        setOrderLines(newLines)
     }
 
-    // Calculate the price for a product
-    const getProductPrice = (productId: string): number => {
-        const product = products.find((p) => p.id === productId)
-        return product ? product.price : 0
+    // Handle total changes from OrderItemsEditor
+    const handleTotalChange = (total: number) => {
+        setOrderTotal(total)
     }
 
-    // Calculate the total price for the order
-    const calculateTotal = (): string => {
-        const total = orderItems.reduce((sum, item) => {
-            const price = getProductPrice(item.productId)
-            return sum + price * item.quantity
-        }, 0)
-
-        return `${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    }
-
-    // Get product name by ID
-    const getProductName = (productId: string): string => {
-        const product = products.find((p) => p.id === productId)
-        return product ? product.name : ""
+    // Handle export with fallback options
+    const handleExportOrder = (order: Order) => {
+        try {
+            console.log('Attempting to export order:', order.order_id)
+            exportOrderToPDF(order)
+        } catch (error) {
+            console.error('PDF export failed, trying HTML export:', error)
+            exportOrderToHTML(order)
+        }
     }
 
     // Format price as string
@@ -241,49 +256,48 @@ export default function CommandesPage() {
         return `${price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     }
 
-    const handleCreateOrder = () => {
-        if (!customerId || !agentId || orderItems.some((item) => !item.productId)) {
+    const handleCreateOrder = async () => {
+        if (orderLines.some((line) => !line.article_id)) {
             return
         }
 
-        // Create new order
-        const customer = customers.find((c) => c.id === customerId)?.name || ""
-        const agent = agents.find((a) => a.id === agentId)?.name || ""
+        try {
+            // Prepare data in the format expected by the API
+            const orderData = {
+                items: orderLines.map((line) => ({
+                    article_id: line.article_id,
+                    quantity: line.quantity,
+                })),
+                notes: notes || "Order created from admin panel",
+            }
 
-        const newOrderItems: OrderItem[] = orderItems.map((item) => ({
-            name: getProductName(item.productId),
-            quantity: item.quantity,
-            price: formatPrice(getProductPrice(item.productId)),
-        }))
+            // Send POST request to create order
+            const response = await api.post("/orders", orderData)
 
-        const total = calculateTotal()
+            // If successful, refresh the orders list
+            if (response.data) {
+                // Refresh orders from API to get the latest data
+                const ordersResponse = await api.get("/orders/lines")
+                if (ordersResponse.data && ordersResponse.data.data) {
+                    setOrders(ordersResponse.data.data)
+                }
 
-        // Generate a new order ID
-        const orderId = `ORD-${new Date().getFullYear()}-${String(orders.length + 1).padStart(3, "0")}`
-
-        const newOrder: Order = {
-            id: orderId,
-            date: new Date(),
-            customer,
-            items: newOrderItems,
-            total,
-            paymentStatus,
-            agent,
+                // Reset form and close dialog
+                resetOrderForm()
+                setNewOrderDialogOpen(false)
+            }
+        } catch (error) {
+            console.error("Error creating order:", error)
+            // You might want to show an error message to the user here
+            alert("Failed to create order. Please try again.")
         }
-
-        // Add the new order to the orders state
-        setOrders([newOrder, ...orders])
-
-        // Reset form and close dialog
-        resetOrderForm()
-        setNewOrderDialogOpen(false)
     }
 
     const resetOrderForm = () => {
-        setOrderItems([{ productId: "", quantity: 1 }])
-        setCustomerId("")
-        setAgentId("")
+        setOrderLines([{ article_id: 0, quantity: 1 }])
         setPaymentStatus("Pending")
+        setNotes("")
+        setOrderTotal(0)
     }
 
     return (
@@ -293,108 +307,26 @@ export default function CommandesPage() {
                     <h1 className="text-2xl font-bold text-white">Orders</h1>
                     <p className="text-zinc-400">Manage customer orders</p>
                 </div>
-                <Dialog
+                <CreateOrderDialog
                     open={newOrderDialogOpen}
                     onOpenChange={(open) => {
                         setNewOrderDialogOpen(open)
                         if (!open) resetOrderForm()
                     }}
-                >
-                    <DialogTrigger asChild>
-                        <Button className="bg-purple-600 hover:bg-purple-700">
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Order
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[500px] bg-zinc-900 border-zinc-800 p-0">
-                        <div className="p-6 space-y-6">
-                            <div className="flex justify-between items-center">
-                                <h2 className="text-xl font-semibold text-white">Create New Order</h2>
-                            </div>
-
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div>
-                                        <Label htmlFor="customer" className="mb-2 block text-white">
-                                            Customer
-                                        </Label>
-                                        <Select value={customerId} onValueChange={setCustomerId}>
-                                            <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
-                                                <SelectValue placeholder="Select customer" />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-zinc-800 border-zinc-700">
-                                                {customers.map((customer) => (
-                                                    <SelectItem key={customer.id} value={customer.id}>
-                                                        {customer.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="agent" className="mb-2 block text-white">
-                                            Agent
-                                        </Label>
-                                        <Select value={agentId} onValueChange={setAgentId}>
-                                            <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
-                                                <SelectValue placeholder="Select agent" />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-zinc-800 border-zinc-700">
-                                                {agents.map((agent) => (
-                                                    <SelectItem key={agent.id} value={agent.id}>
-                                                        {agent.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-
-                                <OrderItemsEditor
-                                    products={products}
-                                    orderItems={orderItems}
-                                    onAddItem={addOrderItem}
-                                    onRemoveItem={removeOrderItem}
-                                    onUpdateItem={updateOrderItem}
-                                    getProductPrice={getProductPrice}
-                                    formatPrice={formatPrice}
-                                />
-
-                                <div className="grid grid-cols-1 gap-6">
-                                    <div>
-                                        <Label htmlFor="payment" className="mb-2 block text-white">
-                                            Payment Status
-                                        </Label>
-                                        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-                                            <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
-                                                <SelectValue placeholder="Pending" />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-zinc-800 border-zinc-700">
-                                                <SelectItem value="Pending">Pending</SelectItem>
-                                                <SelectItem value="Paid">Paid</SelectItem>
-                                                <SelectItem value="Refunded">Refunded</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-between items-center">
-                                    <div className="text-zinc-400 font-medium">Total:</div>
-                                    <div className="text-xl font-bold text-white">{calculateTotal()}</div>
-                                </div>
-
-                                <div className="flex justify-end gap-3 pt-4">
-                                    <Button variant="outline" onClick={() => setNewOrderDialogOpen(false)} className="text-black">
-                                        Cancel
-                                    </Button>
-                                    <Button className="bg-purple-600 hover:bg-purple-700" onClick={handleCreateOrder}>
-                                        Create Order
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                    orderLines={orderLines}
+                    paymentStatus={paymentStatus}
+                    notes={notes}
+                    orderTotal={orderTotal}
+                    setPaymentStatus={setPaymentStatus}
+                    setNotes={setNotes}
+                    addOrderLine={addOrderLine}
+                    removeOrderLine={removeOrderLine}
+                    updateOrderLine={updateOrderLine}
+                    onTotalChange={handleTotalChange}
+                    formatPrice={formatPrice}
+                    onCreateOrder={handleCreateOrder}
+                    onCancel={() => setNewOrderDialogOpen(false)}
+                />
             </div>
 
             <div className="flex flex-wrap gap-4">
@@ -425,7 +357,7 @@ export default function CommandesPage() {
                                 </PopoverContent>
                             </Popover>
                             {date && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDate(undefined)}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => setDate(undefined)}>
                                     <span className="sr-only">Clear date</span>
                                     <span className="text-xs">✕</span>
                                 </Button>
@@ -438,7 +370,8 @@ export default function CommandesPage() {
             <OrderTable
                 orders={filteredOrders}
                 onViewOrder={handleViewOrder}
-                onCancelOrder={handleCancelOrder}
+                onDeleteOrder={handleDeleteOrder}
+                onExportOrder={handleExportOrder}
                 formatDate={formatDate}
             />
 
@@ -456,68 +389,62 @@ export default function CommandesPage() {
                                     <div className="mt-2 space-y-2">
                                         <div className="flex justify-between">
                                             <span className="text-zinc-400">Order ID:</span>
-                                            <span className="text-white">{selectedOrder.id}</span>
+                                            <span className="text-white">{selectedOrder.order_id}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-zinc-400">Date:</span>
-                                            <span className="text-white">{formatDate(selectedOrder.date)}</span>
+                                            <span className="text-white">{formatDate(new Date(selectedOrder.created_at))}</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-zinc-400">Status:</span>
-                                            <Badge
-                                                variant="outline"
-                                                className={`px-2 py-1 rounded-full text-xs ${selectedOrder.paymentStatus === "Paid"
-                                                        ? "bg-green-500/20 text-green-500"
-                                                        : selectedOrder.paymentStatus === "Pending"
-                                                            ? "bg-yellow-500/20 text-yellow-500"
-                                                            : selectedOrder.paymentStatus === "Refunded"
-                                                                ? "bg-red-500/20 text-red-500"
-                                                                : "bg-zinc-500/20 text-zinc-400"
-                                                    }`}
-                                            >
-                                                {selectedOrder.paymentStatus}
-                                            </Badge>
+                                            <span className="text-zinc-400">Total Amount:</span>
+                                            <span className="text-white">
+                                                ${parseFloat(selectedOrder.total_amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-medium text-zinc-400">Customer Information</h3>
+                                    <h3 className="text-sm font-medium text-zinc-400">User Information</h3>
                                     <div className="mt-2 space-y-2">
                                         <div className="flex justify-between">
-                                            <span className="text-zinc-400">Customer:</span>
-                                            <span className="text-white">{selectedOrder.customer}</span>
+                                            <span className="text-zinc-400">User:</span>
+                                            <span className="text-white">{selectedOrder.user}</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-zinc-400">Agent:</span>
-                                            <span className="text-white">{selectedOrder.agent}</span>
+                                            <span className="text-zinc-400">Total Items:</span>
+                                            <span className="text-white">{selectedOrder.total_items} items</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-zinc-400">Different Articles:</span>
+                                            <span className="text-white">{selectedOrder.number_of_different_articles} articles</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div>
-                                <h3 className="text-sm font-medium text-zinc-400 mb-2">Order Items</h3>
+                                <h3 className="text-sm font-medium text-zinc-400 mb-2">Order Lines</h3>
                                 <div className="border rounded-md border-zinc-800">
                                     <div className="overflow-x-auto">
                                         <table className="w-full">
                                             <thead>
                                                 <tr className="border-b border-zinc-800">
-                                                    <th className="text-left p-3 text-zinc-400 font-medium">Item</th>
+                                                    <th className="text-left p-3 text-zinc-400 font-medium">Article</th>
                                                     <th className="text-right p-3 text-zinc-400 font-medium">Quantity</th>
-                                                    <th className="text-right p-3 text-zinc-400 font-medium">Price</th>
-                                                    <th className="text-right p-3 text-zinc-400 font-medium">Subtotal</th>
+                                                    <th className="text-right p-3 text-zinc-400 font-medium">Unit Price</th>
+                                                    <th className="text-right p-3 text-zinc-400 font-medium">Line Total</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {selectedOrder.items.map((item, index) => (
+                                                {selectedOrder.items_breakdown.map((line, index) => (
                                                     <tr key={index} className="border-b border-zinc-800">
-                                                        <td className="p-3 text-white">{item.name}</td>
-                                                        <td className="p-3 text-right text-white">{item.quantity}</td>
-                                                        <td className="p-3 text-right text-white">{item.price}</td>
+                                                        <td className="p-3 text-white">{line.article_name}</td>
+                                                        <td className="p-3 text-right text-white">{line.quantity}</td>
                                                         <td className="p-3 text-right text-white">
-                                                            {`${(
-                                                                Number.parseFloat(item.price.replace(/[^0-9.-]+/g, "")) * item.quantity
-                                                            ).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                            ${parseFloat(line.unit_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td className="p-3 text-right text-white">
+                                                            ${parseFloat(line.line_total).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -525,7 +452,9 @@ export default function CommandesPage() {
                                                     <td colSpan={3} className="p-3 text-right text-white">
                                                         Total:
                                                     </td>
-                                                    <td className="p-3 text-right text-white">{selectedOrder.total}</td>
+                                                    <td className="p-3 text-right text-white">
+                                                        ${parseFloat(selectedOrder.total_amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -533,12 +462,15 @@ export default function CommandesPage() {
                                 </div>
                             </div>
                             <div className="flex justify-end gap-3">
-                                <Button variant="outline" onClick={() => setOrderDialogOpen(false)} className="text-black">
+                                <Button variant="outline" onClick={() => setOrderDialogOpen(false)} className="text-black transition-colors">
                                     Close
                                 </Button>
-                                <Button className="bg-purple-600 hover:bg-purple-700">
+                                <Button
+                                    className="bg-purple-600 hover:bg-purple-700 transition-colors"
+                                    onClick={() => handleExportOrder(selectedOrder)}
+                                >
                                     <Download className="mr-2 h-4 w-4" />
-                                    Export
+                                    Export Report
                                 </Button>
                             </div>
                         </div>
@@ -546,20 +478,22 @@ export default function CommandesPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Cancel Order Confirmation Dialog */}
+            {/* Delete Order Confirmation Dialog */}
             <AlertDialog open={cancelOrderDialogOpen} onOpenChange={setCancelOrderDialogOpen}>
                 <AlertDialogContent className="bg-zinc-900 border-zinc-800">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-white">Cancel Order</AlertDialogTitle>
+                        <AlertDialogTitle className="text-white">Delete Order & Restore Stock</AlertDialogTitle>
                         <AlertDialogDescription className="text-zinc-400">
-                            Are you sure you want to cancel this order? This action will mark the order as cancelled and cannot be
-                            undone.
+                            Are you sure you want to delete this order? This will:
+                            <br />• Permanently remove the order from the system
+                            <br />• Restore all ordered quantities back to stock supplies
+                            <br />• This action cannot be undone
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-black">No, keep order</AlertDialogCancel>
+                        <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white">Cancel</AlertDialogCancel>
                         <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={confirmCancelOrder}>
-                            Yes, cancel order
+                            Yes, delete & restore stock
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

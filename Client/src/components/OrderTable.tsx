@@ -1,50 +1,40 @@
 "use client"
 
-import { Download, MoreHorizontal, ShoppingCart } from "lucide-react"
+import { Download, ShoppingCart, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
-type OrderItem = {
-    name: string
+// Types based on API response structure
+type ItemBreakdown = {
+    article_name: string
     quantity: number
-    price: string
+    unit_price: string
+    line_total: string
 }
 
 type Order = {
-    id: string
-    date: Date
-    customer: string
-    items: OrderItem[]
-    total: string
-    paymentStatus: string
-    agent: string
+    order_id: number
+    user: string
+    total_amount: string
+    total_items: number
+    number_of_different_articles: number
+    created_at: string
+    items_breakdown: ItemBreakdown[]
     cancelled?: boolean
 }
 
 interface OrderTableProps {
     orders: Order[]
     onViewOrder: (order: Order) => void
-    onCancelOrder: (order: Order) => void
+    onDeleteOrder: (order: Order) => void
+    onExportOrder: (order: Order) => void
     formatDate: (date: Date) => string
 }
 
-// Get payment status color
-const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-        case "Paid":
-            return "bg-green-500/20 text-green-500"
-        case "Pending":
-            return "bg-yellow-500/20 text-yellow-500"
-        case "Refunded":
-            return "bg-red-500/20 text-red-500"
-        default:
-            return "bg-zinc-500/20 text-zinc-400"
-    }
-}
 
-export default function OrderTable({ orders, onViewOrder, onCancelOrder, formatDate }: OrderTableProps) {
+
+export default function OrderTable({ orders, onViewOrder, onDeleteOrder, onExportOrder, formatDate }: OrderTableProps) {
     return (
         <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
@@ -56,57 +46,53 @@ export default function OrderTable({ orders, onViewOrder, onCancelOrder, formatD
                         <TableRow className="border-zinc-800">
                             <TableHead>Order ID</TableHead>
                             <TableHead>Date</TableHead>
-                            <TableHead>Customer</TableHead>
-                            <TableHead>Total</TableHead>
-                            <TableHead>Payment</TableHead>
-                            <TableHead>Agent</TableHead>
+                            <TableHead>User</TableHead>
+                            <TableHead>Total Amount</TableHead>
+                            <TableHead>Total Items</TableHead>
+                            <TableHead>Different Articles</TableHead>
                             <TableHead>Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {orders.map((order) => (
-                            <TableRow key={order.id} className="border-zinc-800">
-                                <TableCell className="font-medium text-white">{order.id}</TableCell>
-                                <TableCell className="text-white">{formatDate(order.date)}</TableCell>
-                                <TableCell className="text-white">{order.customer}</TableCell>
-                                <TableCell className="text-white">{order.total}</TableCell>
-                                <TableCell>
-                                    <span className={`px-2 py-1 rounded-full text-xs ${getPaymentStatusColor(order.paymentStatus)}`}>
-                                        {order.paymentStatus}
-                                    </span>
+                            <TableRow key={order.order_id} className="border-zinc-800">
+                                <TableCell className="font-medium text-white">#{order.order_id}</TableCell>
+                                <TableCell className="text-white">{formatDate(new Date(order.created_at))}</TableCell>
+                                <TableCell className="text-white">{order.user}</TableCell>
+                                <TableCell className="text-white">
+                                    ${parseFloat(order.total_amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </TableCell>
-                                <TableCell className="text-white">{order.agent}</TableCell>
+                                <TableCell className="text-white">{order.total_items} items</TableCell>
+                                <TableCell className="text-white">{order.number_of_different_articles} articles</TableCell>
                                 <TableCell>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1">
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-8 w-8 text-purple-500 hover:text-purple-400 hover:bg-purple-500/10"
+                                            className="h-8 w-8 text-purple-500 hover:text-purple-400 hover:bg-purple-500/10 transition-colors"
                                             onClick={() => onViewOrder(order)}
+                                            title="View Order"
                                         >
                                             <ShoppingCart className="h-4 w-4" />
-                                            <span className="sr-only">View order {order.id}</span>
                                         </Button>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                    <span className="sr-only">Open menu</span>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="bg-zinc-800 border-zinc-700">
-                                                <DropdownMenuItem
-                                                    className="cursor-pointer text-white"
-                                                    onClick={() => console.log("Export clicked for order:", order.id)}
-                                                >
-                                                    <Download className="h-4 w-4 mr-2" />
-                                                    Export
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem className="cursor-pointer text-red-500" onClick={() => onCancelOrder(order)}>
-                                                    Cancel order
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-green-500 hover:text-green-400 hover:bg-green-500/10 transition-colors"
+                                            onClick={() => onExportOrder(order)}
+                                            title="Export Report"
+                                        >
+                                            <Download className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                            onClick={() => onDeleteOrder(order)}
+                                            title="Delete Order"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 </TableCell>
                             </TableRow>
