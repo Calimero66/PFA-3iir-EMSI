@@ -1,13 +1,14 @@
 import type React from "react"
 
-import { useState, useEffect } from "react"
-import { ArrowRight, ArrowLeft, Plus } from "lucide-react"
+import { useState, useEffect, useMemo, useRef } from "react"
+import { ArrowRight, ArrowLeft, Plus, Search, ChevronDown, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { BarcodeDisplay } from "@/components/barcode-display"
 import { BarcodeInput } from "@/components/barcode-input"
 import api from "@/lib/api"
@@ -39,7 +40,7 @@ interface ArticleDialogProps {
         editingId: number | null,
         categoryName: string,
         supplierName: string,
-    ) => void
+    ) => Promise<void>
     initialFormData?: {
         barcode: string
         name: string
@@ -58,12 +59,25 @@ export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData 
     
     // Form validation state
     const [formError, setFormError] = useState<string | null>(null)
+    const [isSubmitting, setIsSubmitting] = useState(false)
     
     // Categories and suppliers state
-    const [categories, setCategories] = useState<Category[]>([])
-    const [suppliers, setSuppliers] = useState<Supplier[]>([])
     const [categoriesLoading, setCategoriesLoading] = useState(false)
     const [suppliersLoading, setSuppliersLoading] = useState(false)
+
+    // Search states for real-time filtering
+    const [categorySearch, setCategorySearch] = useState("")
+    const [supplierSearch, setSupplierSearch] = useState("")
+    const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
+    const [supplierDropdownOpen, setSupplierDropdownOpen] = useState(false)
+
+    // Store all data for client-side filtering
+    const [allCategories, setAllCategories] = useState<Category[]>([])
+    const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([])
+
+    // Refs for dropdown management
+    const categoryDropdownRef = useRef<HTMLDivElement>(null)
+    const supplierDropdownRef = useRef<HTMLDivElement>(null)
     
     // Form data state
     const [formData, setFormData] = useState({
@@ -76,48 +90,113 @@ export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData 
         notes: "",
     })
     
-    // Fetch categories and suppliers when dialog opens
+    // Fetch categories and suppliers when dialog opens (only once)
     useEffect(() => {
-        if (open) {
+        if (open && allCategories.length === 0) {
             fetchCategories()
+        }
+        if (open && allSuppliers.length === 0) {
             fetchSuppliers()
         }
-    }, [open])
-    
+    }, [open, allCategories.length, allSuppliers.length])
+
     // Update form data when editing an item
     useEffect(() => {
         if (initialFormData && isEditing) {
             setFormData(initialFormData)
         }
     }, [initialFormData, isEditing])
+
+    // Click outside handler for dropdowns
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+                setCategoryDropdownOpen(false)
+            }
+            if (supplierDropdownRef.current && !supplierDropdownRef.current.contains(event.target as Node)) {
+                setSupplierDropdownOpen(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [])
+
+    // Client-side filtering for real-time search
+    const filteredCategories = useMemo(() => {
+        console.log("Filtering categories. Search:", categorySearch, "All categories:", allCategories.length)
+        let filtered = allCategories;
+        if (categorySearch.trim()) {
+            filtered = allCategories.filter(category =>
+                category.name.toLowerCase().includes(categorySearch.toLowerCase())
+            );
+            console.log("Filtered results:", filtered.length)
+        }
+        const result = filtered.slice(0, 50); // Limit to 50 items for performance
+        console.log("Final result:", result.length)
+        return result;
+    }, [allCategories, categorySearch])
+
+    // Client-side filtering for real-time search
+    const filteredSuppliers = useMemo(() => {
+        let filtered = allSuppliers;
+        if (supplierSearch.trim()) {
+            filtered = allSuppliers.filter(supplier =>
+                supplier.name.toLowerCase().includes(supplierSearch.toLowerCase())
+            );
+        }
+        return filtered.slice(0, 50); // Limit to 50 items for performance
+    }, [allSuppliers, supplierSearch])
     
     const fetchCategories = async () => {
+        // Prevent multiple simultaneous requests
+        if (categoriesLoading) return
+
         setCategoriesLoading(true)
         try {
-            const response = await api.get("/categories")
-            
+            const response = await api.get('/categories')
+
             // More defensive data handling
             const categoriesData = response?.data?.data || response?.data || [];
-            setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+            if (Array.isArray(categoriesData)) {
+                setAllCategories(categoriesData);
+                console.log(`Categories loaded: ${categoriesData.length} items`, categoriesData)
+            } else {
+                console.warn("Categories data is not an array:", categoriesData)
+                setAllCategories([])
+            }
         } catch (error) {
             console.error("Error fetching categories:", error)
-            setCategories([])
+            setAllCategories([])
+            setFormError("Failed to load categories. Please try again.")
         } finally {
             setCategoriesLoading(false)
         }
     }
 
     const fetchSuppliers = async () => {
+        // Prevent multiple simultaneous requests
+        if (suppliersLoading) return
+
         setSuppliersLoading(true)
         try {
-            const response = await api.get("/suppliers")
-            
+            const response = await api.get('/suppliers')
+
             // More defensive data handling
             const suppliersData = response?.data?.data || response?.data || [];
-            setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
+            if (Array.isArray(suppliersData)) {
+                setAllSuppliers(suppliersData);
+                console.log(`Suppliers loaded: ${suppliersData.length} items`)
+            } else {
+                console.warn("Suppliers data is not an array:", suppliersData)
+                setAllSuppliers([])
+            }
         } catch (error) {
             console.error("Error fetching suppliers:", error)
-            setSuppliers([])
+            setAllSuppliers([])
+            setFormError("Failed to load suppliers. Please try again.")
         } finally {
             setSuppliersLoading(false)
         }
@@ -158,26 +237,37 @@ export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData 
         setStep(1)
     }
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         // Validate form data
         if (!formData.name || !formData.price || !formData.quantity || !formData.category_id || !formData.supplier_id) {
             setFormError("Please fill in all required fields")
             return
         }
 
-        // Get category and supplier names for display with safe lookups
-        const selectedCategory = categories.find((cat) => cat?.id?.toString() === formData.category_id)
-        const selectedSupplier = suppliers.find((sup) => sup?.id?.toString() === formData.supplier_id)
+        setIsSubmitting(true)
+        setFormError(null)
 
-        onSubmit(
-            formData, 
-            isEditing, 
-            editingId, 
-            selectedCategory?.name || "", 
-            selectedSupplier?.name || ""
-        )
-        resetForm()
-        setOpen(false)
+        try {
+            // Get category and supplier names for display with safe lookups
+            const selectedCategory = allCategories.find((cat) => cat?.id?.toString() === formData.category_id)
+            const selectedSupplier = allSuppliers.find((sup) => sup?.id?.toString() === formData.supplier_id)
+
+            await onSubmit(
+                formData,
+                isEditing,
+                editingId,
+                selectedCategory?.name || "",
+                selectedSupplier?.name || ""
+            )
+
+            resetForm()
+            setOpen(false)
+        } catch (error) {
+            console.error("Error submitting form:", error)
+            setFormError("Failed to save article. Please try again.")
+        } finally {
+            setIsSubmitting(false)
+        }
     }
 
     const resetForm = () => {
@@ -192,14 +282,21 @@ export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData 
         })
         setStep(1)
         setFormError(null)
+        setIsSubmitting(false)
+
+        // Reset search states
+        setCategorySearch("")
+        setSupplierSearch("")
+        setCategoryDropdownOpen(false)
+        setSupplierDropdownOpen(false)
     }
 
     // Alternative approach - don't use DialogTrigger at all
     return (
         <>
-            <Button 
+            <Button
                 type="button"
-                className="bg-purple-600 transition-colors"
+                className="bg-neutral-900 text-white hover:bg-purple-600 transition-colors"
                 onClick={() => setOpen(true)}
             >
                 <Plus className="mr-2 h-4 w-4" />
@@ -263,42 +360,144 @@ export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData 
 
                                 <div className="grid gap-2">
                                     <Label className="text-zinc-400">Category *</Label>
-                                    <Select value={formData.category_id} onValueChange={handleCategoryChange}>
-                                        <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
-                                            <SelectValue placeholder={categoriesLoading ? "Loading categories..." : "Select category..."} />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-zinc-800 border-zinc-700">
-                                            {categories.map((category) => (
-                                                <SelectItem
-                                                    key={category.id}
-                                                    value={category.id.toString()}
-                                                    className="text-white hover:bg-zinc-700"
-                                                >
-                                                    {category.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <div className="relative" ref={categoryDropdownRef}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
+                                            className="flex h-10 w-full items-center justify-between rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <span>
+                                                {formData.category_id
+                                                    ? allCategories.find(cat => cat.id.toString() === formData.category_id)?.name || "Select category..."
+                                                    : categoriesLoading ? "Loading categories..." : "Select category..."
+                                                }
+                                            </span>
+                                            <ChevronDown className="h-4 w-4 opacity-50" />
+                                        </button>
+
+                                        {categoryDropdownOpen && (
+                                            <div className="absolute z-50 mt-1 w-full rounded-md border border-zinc-700 bg-zinc-800 shadow-lg">
+                                                <div className="flex items-center px-3 py-2 border-b border-zinc-700">
+                                                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                                    <Input
+                                                        placeholder="Search categories..."
+                                                        value={categorySearch}
+                                                        onChange={(e) => setCategorySearch(e.target.value)}
+                                                        className="h-8 w-full bg-transparent border-0 focus:ring-0 text-white placeholder:text-zinc-500"
+                                                        autoFocus
+                                                    />
+                                                </div>
+                                                <div className="max-h-60 overflow-auto">
+                                                    {categoriesLoading ? (
+                                                        <div className="px-3 py-2 text-zinc-400 text-sm flex items-center gap-2">
+                                                            <LoadingSpinner size="sm" />
+                                                            Loading categories...
+                                                        </div>
+                                                    ) : filteredCategories.length === 0 ? (
+                                                        <div className="px-3 py-2 text-zinc-400 text-sm">
+                                                            {categorySearch ? "No categories found" : "No categories available"}
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            {filteredCategories.map((category) => (
+                                                                <button
+                                                                    key={category.id}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        handleCategoryChange(category.id.toString())
+                                                                        setCategoryDropdownOpen(false)
+                                                                        setCategorySearch("")
+                                                                    }}
+                                                                    className="flex w-full items-center px-3 py-2 text-sm text-white hover:bg-zinc-700 focus:bg-zinc-700 focus:outline-none"
+                                                                >
+                                                                    <span className="flex-1 text-left">{category.name}</span>
+                                                                    {formData.category_id === category.id.toString() && (
+                                                                        <Check className="h-4 w-4" />
+                                                                    )}
+                                                                </button>
+                                                            ))}
+                                                            {filteredCategories.length === 50 && (
+                                                                <div className="px-3 py-2 text-zinc-500 text-xs border-t border-zinc-700">
+                                                                    Showing first 50 results. Use search to find more.
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="grid gap-2">
                                     <Label className="text-zinc-400">Supplier *</Label>
-                                    <Select value={formData.supplier_id} onValueChange={handleSupplierChange}>
-                                        <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white">
-                                            <SelectValue placeholder={suppliersLoading ? "Loading suppliers..." : "Select supplier..."} />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-zinc-800 border-zinc-700">
-                                            {suppliers.map((supplier) => (
-                                                <SelectItem
-                                                    key={supplier.id}
-                                                    value={supplier.id.toString()}
-                                                    className="text-white hover:bg-zinc-700"
-                                                >
-                                                    {supplier.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <div className="relative" ref={supplierDropdownRef}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSupplierDropdownOpen(!supplierDropdownOpen)}
+                                            className="flex h-10 w-full items-center justify-between rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <span>
+                                                {formData.supplier_id
+                                                    ? allSuppliers.find(sup => sup.id.toString() === formData.supplier_id)?.name || "Select supplier..."
+                                                    : suppliersLoading ? "Loading suppliers..." : "Select supplier..."
+                                                }
+                                            </span>
+                                            <ChevronDown className="h-4 w-4 opacity-50" />
+                                        </button>
+
+                                        {supplierDropdownOpen && (
+                                            <div className="absolute z-50 mt-1 w-full rounded-md border border-zinc-700 bg-zinc-800 shadow-lg">
+                                                <div className="flex items-center px-3 py-2 border-b border-zinc-700">
+                                                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                                    <Input
+                                                        placeholder="Search suppliers..."
+                                                        value={supplierSearch}
+                                                        onChange={(e) => setSupplierSearch(e.target.value)}
+                                                        className="h-8 w-full bg-transparent border-0 focus:ring-0 text-white placeholder:text-zinc-500"
+                                                        autoFocus
+                                                    />
+                                                </div>
+                                                <div className="max-h-60 overflow-auto">
+                                                    {suppliersLoading ? (
+                                                        <div className="px-3 py-2 text-zinc-400 text-sm flex items-center gap-2">
+                                                            <LoadingSpinner size="sm" />
+                                                            Loading suppliers...
+                                                        </div>
+                                                    ) : filteredSuppliers.length === 0 ? (
+                                                        <div className="px-3 py-2 text-zinc-400 text-sm">
+                                                            {supplierSearch ? "No suppliers found" : "No suppliers available"}
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            {filteredSuppliers.map((supplier) => (
+                                                                <button
+                                                                    key={supplier.id}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        handleSupplierChange(supplier.id.toString())
+                                                                        setSupplierDropdownOpen(false)
+                                                                        setSupplierSearch("")
+                                                                    }}
+                                                                    className="flex w-full items-center px-3 py-2 text-sm text-white hover:bg-zinc-700 focus:bg-zinc-700 focus:outline-none"
+                                                                >
+                                                                    <span className="flex-1 text-left">{supplier.name}</span>
+                                                                    {formData.supplier_id === supplier.id.toString() && (
+                                                                        <Check className="h-4 w-4" />
+                                                                    )}
+                                                                </button>
+                                                            ))}
+                                                            {filteredSuppliers.length === 50 && (
+                                                                <div className="px-3 py-2 text-zinc-500 text-xs border-t border-zinc-700">
+                                                                    Showing first 50 results. Use search to find more.
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="grid gap-2">
@@ -352,8 +551,15 @@ export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData 
                                         <ArrowLeft className="mr-2 h-4 w-4" />
                                         Back
                                     </Button>
-                                    <Button className="bg-purple-600 transition-colors" onClick={handleSubmit}>
-                                        {isEditing ? "Update Item" : "Add Item"}
+                                    <Button
+                                        className="bg-purple-600 hover:bg-purple-700 transition-colors"
+                                        onClick={handleSubmit}
+                                        disabled={isSubmitting}
+                                    >
+                                        {isSubmitting
+                                            ? (isEditing ? "Updating..." : "Adding...")
+                                            : (isEditing ? "Update Item" : "Add Item")
+                                        }
                                     </Button>
                                 </div>
                             </div>

@@ -81,7 +81,7 @@ export default function OrderItemsEditor({
         <div>
             <div className="flex justify-between items-center mb-4">
                 <Label>Order Items</Label>
-                <Button variant="outline" size="sm" className="h-8 bg-zinc-800 border-zinc-700 text-white" onClick={onAddItem}>
+                <Button variant="outline" size="sm" className="h-8 bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700 transition-colors" onClick={onAddItem}>
                     <Plus className="h-3.5 w-3.5 mr-1" />
                     Add Item
                 </Button>

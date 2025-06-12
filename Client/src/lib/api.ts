@@ -3,7 +3,7 @@ import Cookies from 'js-cookie'
 
 const api: AxiosInstance = axios.create({
     baseURL: 'http://127.0.0.1:8000/api',
-    timeout: 5000,
+    timeout: 10000, // Increased timeout to 10 seconds for large data sets
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
@@ -12,22 +12,14 @@ const api: AxiosInstance = axios.create({
     }
 });
 
-// Request interceptor with enhanced debugging
+// Request interceptor
 api.interceptors.request.use((config) => {
     const token = Cookies.get('token')
-    
-    // Enhanced debugging
-    console.log('Current cookies:', Cookies.get())
-    console.log('Token from cookie:', token)
-    console.log('Original headers:', config.headers)
-    
+
     if (token) {
         config.headers.Authorization = `Bearer ${token}`
-        console.log('Updated headers with token:', config.headers)
-    } else {
-        console.warn('No token found in cookies')
     }
-    
+
     return config
 }, (error) => {
     console.error('Request interceptor error:', error)

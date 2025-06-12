@@ -196,7 +196,7 @@ export default function CategoryFormDialog({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="bg-purple-600 hover:bg-purple-700 transition-colors" onClick={handleAddClick}>
+                <Button className="bg-neutral-900 text-white hover:bg-purple-600 transition-colors" onClick={handleAddClick}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Category
                 </Button>

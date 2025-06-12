@@ -54,23 +54,25 @@ export default function ArticlesPage() {
     const [selectedArticle, setSelectedArticle] = useState<ArticleItem | null>(null)
 
     useEffect(() => {
-        fetcharticleItems()
+        fetchArticleItems()
     }, [])
 
-    const fetcharticleItems = async () => {
+    const fetchArticleItems = async (showLoading = true) => {
         try {
-            setLoading(true)
+            if (showLoading) {
+                setLoading(true)
+            }
             const response = await api.get("/articles")
-            console.log("🚀 ~ fetcharticleItems ~ response:", response)
-            
-            // Ensure we're setting an array to state
-            if (Array.isArray(response.data)) {
+            console.log("🚀 ~ fetchArticleItems ~ response:", response)
+
+            // Based on Laravel backend: GET /articles returns { data: articles }
+            if (response.data && response.data.data && Array.isArray(response.data.data)) {
+                setArticleItem(response.data.data)
+                console.log("📊 Loaded articles count:", response.data.data.length)
+            } else if (Array.isArray(response.data)) {
+                // Fallback if response format changes
                 setArticleItem(response.data)
-            } else if (response.data && typeof response.data === 'object') {
-                // If response.data is an object that might contain the array
-                // Check common API response patterns
-                const items = response.data.articles || response.data.data || response.data.items || []
-                setArticleItem(items)
+                console.log("📊 Loaded articles count:", response.data.length)
             } else {
                 // Fallback to empty array if data format is unexpected
                 console.error("Unexpected API response format:", response.data)
@@ -80,7 +82,9 @@ export default function ArticlesPage() {
             console.error("Error fetching article items:", error)
             setArticleItem([]) // Ensure we reset to empty array on error
         } finally {
-            setLoading(false)
+            if (showLoading) {
+                setLoading(false)
+            }
         }
     }
 
@@ -104,6 +108,7 @@ export default function ArticlesPage() {
 
             if (isEditing && editingId) {
                 // Update existing item
+                console.log("🔄 Updating article:", editingId, payload)
                 await api.put(`/articles/${editingId}`, payload)
 
                 // Update the item in local state with nested objects
@@ -125,11 +130,30 @@ export default function ArticlesPage() {
                             : item,
                     ),
                 )
+                console.log("✅ Article updated successfully")
             } else {
                 // Create new item
+                console.log("➕ Creating new article:", payload)
                 const response = await api.post("/articles", payload)
-                // The response now contains nested category and supplier
-                setArticleItem((prev) => [...prev, response.data])
+                console.log("🚀 ~ addArticle ~ API response:", response)
+
+                // Based on Laravel backend: POST /articles returns { message, article, stock_supply }
+                if (response.data && response.data.article) {
+                    // The new article is under response.data.article
+                    const newArticle = response.data.article
+                    console.log("📝 Adding new article to state:", newArticle)
+
+                    // We need to load the article with relationships (category, supplier, user)
+                    // Since the POST response might not include these relationships, let's refresh the list
+                    console.log("� Refreshing article list to get complete data with relationships...")
+                    await fetchArticleItems(false) // No loading state - instant update like categories
+                    console.log("✅ New article added and list refreshed successfully")
+                } else {
+                    console.error("❌ Invalid API response format:", response)
+                    // Fallback: refresh the entire list
+                    console.log("🔄 Refreshing article list as fallback...")
+                    await fetchArticleItems(false) // No loading state
+                }
             }
 
             // Reset editing state
@@ -137,7 +161,10 @@ export default function ArticlesPage() {
             setEditingId(null)
             setInitialFormData(undefined)
         } catch (error) {
-            console.error("Error saving article item:", error)
+            console.error("❌ Error saving article item:", error)
+            // On error, refresh the list to ensure consistency
+            console.log("🔄 Refreshing article list due to error...")
+            await fetchArticleItems(false) // No loading state
         }
     }
 

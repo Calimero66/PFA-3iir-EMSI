@@ -114,7 +114,7 @@ export default function AgentsPage() {
 
     return (
         <div className="p-6 space-y-6">
-            <Toaster position="top-right" />
+            <Toaster position="bottom-right" />
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-white">Agent Management</h1>

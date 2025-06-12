@@ -6,6 +6,7 @@ import Dashboard from "./pages/admin/dashboard";
 import Articles from "./pages/admin/Articles";
 import Reports from "./pages/admin/reports";
 import Orders from "./pages/admin/orders";
+import Stock from "./pages/admin/stock";
 import ProtectedRoute from "./components/ProtectRoute/ProtectedRoute";
 import PublicRoute from "./components/ProtectRoute/PublicRoute";
 import Suppliers from "./pages/admin/suppliers";
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
             { path: "/Dashboard", element: <Dashboard />, index: true },
             { path: "/Users", element: <Users /> },
             { path: "/Articles", element: <Articles /> },
+            { path: "/Stock", element: <Stock /> },
             { path: "/Reports", element: <Reports /> },
             { path: "/Orders", element: <Orders /> },
             { path: "/suppliers", element: <Suppliers /> },

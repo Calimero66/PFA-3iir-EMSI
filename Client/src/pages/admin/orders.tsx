@@ -2,8 +2,6 @@ import { useState, useEffect } from "react"
 import { Calendar, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 import api from "@/lib/api"
@@ -55,10 +53,7 @@ const formatDate = (date: Date, options: Intl.DateTimeFormatOptions = {}) => {
     return new Intl.DateTimeFormat("en-US", { ...defaultOptions, ...options }).format(date)
 }
 
-// Helper function to format date to YYYY-MM-DD for comparison
-const formatDateForComparison = (date: Date) => {
-    return date.toISOString().split("T")[0]
-}
+
 
 // Define a type for new order form items (based on Laravel migration)
 type NewOrderLine = {
@@ -100,7 +95,21 @@ export default function CommandesPage() {
 
     // Filter orders based on selected date
     const filteredOrders = orders.filter((order) => {
-        const dateMatch = !date || formatDateForComparison(new Date(order.created_at)) === formatDateForComparison(date)
+        if (!date) return !order.cancelled
+
+        // Get the order date and selected date in YYYY-MM-DD format
+        const orderDate = new Date(order.created_at)
+        const selectedDateStr = date.toISOString().split('T')[0]
+        const orderDateStr = orderDate.toISOString().split('T')[0]
+
+        console.log('Filtering:', {
+            selectedDate: selectedDateStr,
+            orderDate: orderDateStr,
+            orderCreatedAt: order.created_at,
+            match: orderDateStr === selectedDateStr
+        })
+
+        const dateMatch = orderDateStr === selectedDateStr
         return dateMatch && !order.cancelled
     })
 
@@ -337,27 +346,23 @@ export default function CommandesPage() {
                                 <Calendar className="h-4 w-4 text-zinc-400" />
                                 <span className="text-sm text-zinc-400">Date:</span>
                             </div>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        className="w-[180px] justify-start text-left font-normal bg-zinc-800 border-zinc-700"
-                                    >
-                                        {date ? formatDate(date, { hour: undefined, minute: undefined }) : <span>Pick a date</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0 bg-zinc-800 border-zinc-700">
-                                    <CalendarComponent
-                                        mode="single"
-                                        selected={date}
-                                        onSelect={setDate}
-                                        initialFocus
-                                        className="bg-zinc-800"
-                                    />
-                                </PopoverContent>
-                            </Popover>
+                            <div className="relative">
+                                <input
+                                    type="date"
+                                    value={date ? date.toISOString().split('T')[0] : ''}
+                                    onChange={(e) => {
+                                        if (e.target.value) {
+                                            setDate(new Date(e.target.value))
+                                        } else {
+                                            setDate(undefined)
+                                        }
+                                    }}
+                                    className="w-[180px] h-9 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:opacity-70 [&::-webkit-calendar-picker-indicator]:hover:opacity-100"
+                                    placeholder="Pick a date"
+                                />
+                            </div>
                             {date && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 transition-colors" onClick={() => setDate(undefined)}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors" onClick={() => setDate(undefined)}>
                                     <span className="sr-only">Clear date</span>
                                     <span className="text-xs">✕</span>
                                 </Button>

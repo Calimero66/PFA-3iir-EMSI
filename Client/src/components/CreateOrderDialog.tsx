@@ -61,7 +61,7 @@ export default function CreateOrderDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogTrigger asChild>
-                <Button className="bg-purple-600 hover:bg-purple-700">
+                <Button className="bg-neutral-900 text-white hover:bg-purple-600 transition-colors">
                     <Plus className="mr-2 h-4 w-4" />
                     New Order
                 </Button>
@@ -122,7 +122,7 @@ export default function CreateOrderDialog({
                             <Button variant="outline" onClick={onCancel} className="text-black">
                                 Cancel
                             </Button>
-                            <Button className="bg-purple-600 hover:bg-purple-700" onClick={onCreateOrder}>
+                            <Button className="bg-purple-600 hover:bg-purple-700 transition-colors" onClick={onCreateOrder}>
                                 Create Order
                             </Button>
                         </div>

@@ -53,7 +53,7 @@ const LoginPage = () => {
 
     return (
         <div className="min-h-screen bg-black text-white">
-            <Toaster richColors />
+            <Toaster richColors position="bottom-right" />
 
             {/* Header */}
             <header className="container mx-auto flex items-center justify-between py-6">
