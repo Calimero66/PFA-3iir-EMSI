@@ -6,6 +6,7 @@ use App\Models\OrderLine;
 use App\Models\Order;
 use App\Models\StockSupply;
 use App\Models\StockMovement;
+use App\Models\Report;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -181,6 +182,19 @@ class OrderLineController extends Controller
 
                 Log::info("Starting deletion of Order Line #{$orderLine->id} for article {$article->name}");
 
+                // Delete related reports for this order line
+                $deletedReports = [];
+                $reports = Report::where('order_line_id', $orderLine->id)->get();
+                foreach ($reports as $report) {
+                    $deletedReports[] = [
+                        'report_id' => $report->id,
+                        'type' => $report->type,
+                        'details' => $report->details
+                    ];
+                    $report->delete();
+                    Log::info("Deleted report #{$report->id} for order line #{$orderLine->id}");
+                }
+
                 try {
                     // Find the stock supply for this article
                     $stockSupply = StockSupply::where('article_id', $article->id)->first();
@@ -257,7 +271,9 @@ class OrderLineController extends Controller
                     'deleted_order_line_id' => $orderLine->id,
                     'order_id' => $order->id,
                     'order_deleted' => $orderDeleted,
-                    'stock_restored' => $stockRestored
+                    'stock_restored' => $stockRestored,
+                    'deleted_reports' => $deletedReports,
+                    'deleted_reports_count' => count($deletedReports)
                 ];
 
                 if (!$orderDeleted) {

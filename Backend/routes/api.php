@@ -69,6 +69,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('reports/{id}/ticket', [ReportController::class, 'generateTicket']);
     Route::get('reports/{id}', [ReportController::class, 'show']);
 
+    // Report deletion routes
+    Route::delete('reports/multiple', [ReportController::class, 'destroyMultiple']);
+    Route::delete('reports/type/{type}', [ReportController::class, 'destroyByType']);
+    Route::delete('reports/date-range', [ReportController::class, 'destroyByDateRange']);
+    Route::delete('reports/{id}', [ReportController::class, 'destroy']);
+
     // Sales Analytics routes
     Route::get('reports/sales/list', [ReportController::class, 'getSalesReports']);
     Route::get('reports/sales/summary', [ReportController::class, 'getSalesSummary']);

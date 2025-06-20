@@ -45,7 +45,7 @@ export default function TransactionReportsTable({
                             <TableHead>Product</TableHead>
                             <TableHead>Quantity</TableHead>
                             <TableHead>Total</TableHead>
-                            <TableHead>Actions</TableHead>
+                            {/* <TableHead>Actions</TableHead> */}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -77,7 +77,7 @@ export default function TransactionReportsTable({
                                         onClick={() => onExport(report.id)}
                                         title="Export Report"
                                     >
-                                        <Download className="h-4 w-4" />
+                                        {/* <Download className="h-4 w-4" /> */}
                                     </Button>
                                 </TableCell>
                             </TableRow>

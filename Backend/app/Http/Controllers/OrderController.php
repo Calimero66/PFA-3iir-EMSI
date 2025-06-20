@@ -8,6 +8,7 @@ use App\Models\OrderLine;
 use App\Models\StockSupply;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Models\Report;
 use App\Services\StockService;
 use App\Services\ReportService;
 use Illuminate\Http\Request;
@@ -258,8 +259,24 @@ class OrderController extends Controller
 
                 $restoredItems = [];
                 $failedRestorations = [];
+                $deletedReports = [];
 
                 Log::info("Starting deletion of Order #{$order->id}");
+
+                // Delete related reports for each order line
+                foreach ($orderWithLines->orderLines as $orderLine) {
+                    $reports = Report::where('order_line_id', $orderLine->id)->get();
+                    foreach ($reports as $report) {
+                        $deletedReports[] = [
+                            'report_id' => $report->id,
+                            'order_line_id' => $orderLine->id,
+                            'type' => $report->type,
+                            'details' => $report->details
+                        ];
+                        $report->delete();
+                        Log::info("Deleted report #{$report->id} for order line #{$orderLine->id}");
+                    }
+                }
 
                 // Restore stock quantities for each order line
                 foreach ($orderWithLines->orderLines as $orderLine) {
@@ -324,7 +341,9 @@ class OrderController extends Controller
                 $response = [
                     'message' => 'Order deleted successfully',
                     'deleted_order_id' => $order->id,
-                    'restored_items' => $restoredItems
+                    'restored_items' => $restoredItems,
+                    'deleted_reports' => $deletedReports,
+                    'deleted_reports_count' => count($deletedReports)
                 ];
 
                 if (!empty($failedRestorations)) {
@@ -365,12 +384,29 @@ class OrderController extends Controller
             return DB::transaction(function () use ($request) {
                 $deletedOrders = [];
                 $restoredItems = [];
+                $deletedReports = [];
 
                 foreach ($request->order_ids as $orderId) {
                     $order = Order::with(['orderLines.article'])->find($orderId);
 
                     if (!$order) {
                         continue; // Skip if order not found
+                    }
+
+                    // Delete related reports for each order line
+                    foreach ($order->orderLines as $orderLine) {
+                        $reports = Report::where('order_line_id', $orderLine->id)->get();
+                        foreach ($reports as $report) {
+                            $deletedReports[] = [
+                                'report_id' => $report->id,
+                                'order_line_id' => $orderLine->id,
+                                'order_id' => $orderId,
+                                'type' => $report->type,
+                                'details' => $report->details
+                            ];
+                            $report->delete();
+                            Log::info("Deleted report #{$report->id} for order line #{$orderLine->id} in order #{$orderId}");
+                        }
                     }
 
                     // Restore stock quantities for each order line
@@ -409,7 +445,9 @@ class OrderController extends Controller
                 return response()->json([
                     'message' => 'Orders deleted successfully and stock quantities restored',
                     'deleted_orders' => $deletedOrders,
-                    'restored_items' => $restoredItems
+                    'restored_items' => $restoredItems,
+                    'deleted_reports' => $deletedReports,
+                    'deleted_reports_count' => count($deletedReports)
                 ], 200);
             });
         } catch (\Exception $e) {

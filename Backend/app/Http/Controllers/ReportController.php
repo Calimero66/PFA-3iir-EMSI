@@ -7,6 +7,8 @@ use App\Services\ReportService;
 use App\Services\SalesAnalyticsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
@@ -290,6 +292,235 @@ class ReportController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error generating item sales report',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a specific report
+     */
+    public function destroy($id)
+    {
+        try {
+            $report = Report::find($id);
+
+            if (!$report) {
+                return response()->json([
+                    'message' => 'Report not found'
+                ], 404);
+            }
+
+            // Store report info before deletion for response
+            $reportInfo = [
+                'id' => $report->id,
+                'type' => $report->type,
+                'report_date' => $report->report_date,
+                'details' => $report->details
+            ];
+
+            $report->delete();
+
+            Log::info("Report #{$id} deleted successfully");
+
+            return response()->json([
+                'message' => 'Report deleted successfully',
+                'deleted_report' => $reportInfo
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error deleting report: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete report',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete multiple reports
+     */
+    public function destroyMultiple(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'report_ids' => 'required|array|min:1',
+            'report_ids.*' => 'required|integer|exists:reports,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            return DB::transaction(function () use ($request) {
+                $deletedReports = [];
+                $notFoundReports = [];
+
+                foreach ($request->report_ids as $reportId) {
+                    $report = Report::find($reportId);
+
+                    if ($report) {
+                        $reportInfo = [
+                            'id' => $report->id,
+                            'type' => $report->type,
+                            'report_date' => $report->report_date,
+                            'details' => $report->details
+                        ];
+
+                        $report->delete();
+                        $deletedReports[] = $reportInfo;
+                        Log::info("Report #{$reportId} deleted successfully");
+                    } else {
+                        $notFoundReports[] = $reportId;
+                    }
+                }
+
+                $response = [
+                    'message' => 'Reports deletion completed',
+                    'deleted_reports' => $deletedReports,
+                    'deleted_count' => count($deletedReports)
+                ];
+
+                if (!empty($notFoundReports)) {
+                    $response['not_found_reports'] = $notFoundReports;
+                    $response['message'] = 'Reports deletion completed with some reports not found';
+                }
+
+                return response()->json($response, 200);
+            });
+
+        } catch (\Exception $e) {
+            Log::error('Error deleting multiple reports: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete reports',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete reports by type
+     */
+    public function destroyByType($type)
+    {
+        $validator = Validator::make(['type' => $type], [
+            'type' => 'required|in:supply,sale'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Invalid report type',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            return DB::transaction(function () use ($type) {
+                $reports = Report::where('type', $type)->get();
+
+                if ($reports->isEmpty()) {
+                    return response()->json([
+                        'message' => "No reports found for type: {$type}"
+                    ], 404);
+                }
+
+                $deletedReports = [];
+                foreach ($reports as $report) {
+                    $deletedReports[] = [
+                        'id' => $report->id,
+                        'type' => $report->type,
+                        'report_date' => $report->report_date,
+                        'details' => $report->details
+                    ];
+                }
+
+                $deletedCount = Report::where('type', $type)->delete();
+
+                Log::info("Deleted {$deletedCount} reports of type: {$type}");
+
+                return response()->json([
+                    'message' => "All {$type} reports deleted successfully",
+                    'deleted_count' => $deletedCount,
+                    'deleted_reports' => $deletedReports
+                ], 200);
+            });
+
+        } catch (\Exception $e) {
+            Log::error("Error deleting reports by type {$type}: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete reports by type',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete reports by date range
+     */
+    public function destroyByDateRange(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'type' => 'nullable|in:supply,sale'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            return DB::transaction(function () use ($request) {
+                $query = Report::whereBetween('report_date', [$request->start_date, $request->end_date]);
+
+                if ($request->type) {
+                    $query->where('type', $request->type);
+                }
+
+                $reports = $query->get();
+
+                if ($reports->isEmpty()) {
+                    return response()->json([
+                        'message' => 'No reports found in the specified date range'
+                    ], 404);
+                }
+
+                $deletedReports = [];
+                foreach ($reports as $report) {
+                    $deletedReports[] = [
+                        'id' => $report->id,
+                        'type' => $report->type,
+                        'report_date' => $report->report_date,
+                        'details' => $report->details
+                    ];
+                }
+
+                $deletedCount = $query->delete();
+
+                Log::info("Deleted {$deletedCount} reports from {$request->start_date} to {$request->end_date}");
+
+                return response()->json([
+                    'message' => 'Reports deleted successfully',
+                    'deleted_count' => $deletedCount,
+                    'date_range' => [
+                        'start_date' => $request->start_date,
+                        'end_date' => $request->end_date
+                    ],
+                    'type_filter' => $request->type,
+                    'deleted_reports' => $deletedReports
+                ], 200);
+            });
+
+        } catch (\Exception $e) {
+            Log::error('Error deleting reports by date range: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete reports by date range',
                 'error' => $e->getMessage()
             ], 500);
         }

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Article;
 use App\Models\User;
+use App\Models\StockMovement;
+use App\Models\Report;
 use App\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -191,13 +193,67 @@ class ArticleController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Article $article)
+    public function destroy($id)
     {
-        $article->delete();
+        try {
+            // Find the article manually to avoid route model binding issues
+            $article = Article::find($id);
 
-        return response()->json([
-            'message' => 'Article deleted successfully'
-        ]);
+            if (!$article) {
+                return response()->json([
+                    'message' => 'Article not found'
+                ], 404);
+            }
+
+            return DB::transaction(function () use ($article) {
+                $deletedReports = [];
+
+                // Store article info before deletion
+                $articleId = $article->id;
+                $articleName = $article->name;
+
+                Log::info("Starting deletion of Article #{$articleId} - {$articleName}");
+
+                // Find all stock movements related to this article
+                $stockMovements = StockMovement::where('article_id', $article->id)->get();
+
+                // Delete all reports related to these stock movements
+                foreach ($stockMovements as $stockMovement) {
+                    $reports = Report::where('stock_movement_id', $stockMovement->id)->get();
+                    foreach ($reports as $report) {
+                        $deletedReports[] = [
+                            'report_id' => $report->id,
+                            'stock_movement_id' => $stockMovement->id,
+                            'type' => $report->type,
+                            'details' => $report->details
+                        ];
+                        $report->delete();
+                        Log::info("Deleted report #{$report->id} for stock movement #{$stockMovement->id}");
+                    }
+                }
+
+                // Delete the article (this will cascade delete stock movements due to foreign key constraints)
+                $article->delete();
+
+                Log::info("Article #{$articleId} - {$articleName} deleted successfully");
+
+                $response = [
+                    'message' => 'Article deleted successfully',
+                    'deleted_article_id' => $articleId,
+                    'deleted_article_name' => $articleName,
+                    'deleted_reports' => $deletedReports,
+                    'deleted_reports_count' => count($deletedReports)
+                ];
+
+                return response()->json($response, 200);
+            });
+        } catch (\Exception $e) {
+            Log::error('Error deleting article: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to delete article',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }
 
