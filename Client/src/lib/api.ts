@@ -35,6 +35,7 @@ api.interceptors.response.use(
             Cookies.remove('token')
             
             // Redirect to login page
+            //todo : chnage this windows location to redirect from rooter 
             window.location.href = '/login'
         }
         return Promise.reject(error)

@@ -7,55 +7,75 @@ import { Button } from "@/components/ui/button"
 export function Sidebar() {
     const location = useLocation()
     const pathname = location.pathname
+    const user = JSON.parse(localStorage.getItem("user") || "{}")
 
+    console.log("🚀 ~ Sidebar ~ user:", user)
     const routes = [
         {
             label: "Dashboard",
             icon: LayoutDashboard,
             to: "/dashboard",
             active: pathname === "/dashboard",
+            roles: ["Admin", "Manager", "Agent"],
         },
         {
             label: "Articles",
             icon: Package,
             to: "/articles",
             active: pathname === "/articles",
+            roles: ["Admin", "Manager", "Agent"],
+
         },
         {
             label: "Stock",
             icon: Warehouse,
             to: "/stock",
             active: pathname === "/stock",
+            roles: ["Admin", "Manager", "Agent"],
+
         },
         {
             label: "Users",
             icon: Users,
             to: "/users",
             active: pathname === "/users",
+            roles: ["Admin", "Manager", "Agent"],
+
         }, {
             label: "Reports",
             icon: BarChart,
             to: "/reports",
             active: pathname === "/reports",
+            roles: ["Admin", "Manager", "Agent"],
+
         }, {
             label: "Orders",
             icon: ShoppingCart,
             to: "/Orders",
             active: pathname === "/Orders",
+            roles: ["Admin", "Manager", "Agent"],
+
         },
         {
             label: "Suppliers",
             icon: Users,
             to: "/suppliers",
             active: pathname === "/suppliers",
+            roles: ["Admin", "Manager", "Agent"],
+
         },
         {
             label: "Categories",
             icon: ListPlus,
             to: "/categories",
             active: pathname === "/categories",
+            roles: ["Admin", "Manager", "Agent"],
+
         },
     ]
+
+    const Uroutes = routes.filter(route => route.roles.includes(user?.role));
+    console.log("🚀 ~ Sidebar ~ Uroutes:", Uroutes)
 
     return (
         <div className="flex h-full w-64 flex-col bg-black text-white">
@@ -67,7 +87,7 @@ export function Sidebar() {
                 </Link>
             </div>
             <div className="flex-1 space-y-1 px-3 py-4">
-                {routes.map((route) => (
+                {Uroutes.map((route) => (
                     <Link
                         key={route.to}
                         to={route.to}

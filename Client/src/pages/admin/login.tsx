@@ -25,10 +25,10 @@ const LoginPage = () => {
                 password 
             })
             
-            // Store the token in cookies instead of localStorage
+            // Store the token in cookies
             const { access_token } = response.data
             Cookies.set('token', access_token, { 
-                expires: 7, // expires in 7 days
+                expires: 7, 
                 secure: true, // only transmitted over HTTPS
                 sameSite: 'strict' // protection against CSRF
             })
@@ -39,10 +39,13 @@ const LoginPage = () => {
             toast.success("Login successful", {
                 duration: 1000,
             })
+
+            const user = response.data.user
+            localStorage.setItem("user", JSON.stringify(user))
             
             setTimeout(() => {
                 navigate("/dashboard")
-            }, 1000)
+            }, 500)
         } catch (err) {
             toast.error("Invalid email or password")
             console.error(err)

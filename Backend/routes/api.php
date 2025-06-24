@@ -33,8 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::middleware(IsAdmin::class)->group(function () {
-
-        // Route::post('/GetUserById', [UserController::class, 'GetUserById']);
+        // Admin routes
         Route::apiResource('users', UserController::class);
     });
     Route::middleware(IsManager::class)->group(function () {

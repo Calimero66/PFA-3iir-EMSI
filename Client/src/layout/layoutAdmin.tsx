@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/sideBarAdmin/sidebar"
 import { Outlet } from "react-router-dom"
 
 const Layout = () => {
+    // const user = JSON.parse(localStorage.getItem("user") || "{}")
     return (
         <div className="flex h-screen bg-zinc-950">
             <Sidebar />
