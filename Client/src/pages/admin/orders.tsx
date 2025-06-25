@@ -394,7 +394,7 @@ export default function CommandesPage() {
                         <p className="text-zinc-400">Manage customer orders</p>
                         {!canDelete && (
                             <p className="text-yellow-400 text-sm mt-1">
-                                ⚠️ Limited access - Contact admin for delete permissions
+                                ⚠️ Limited access - Contact manager for delete/edit permissions
                             </p>
                         )}
                     </div>

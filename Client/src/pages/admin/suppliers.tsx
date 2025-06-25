@@ -34,6 +34,31 @@ export default function SuppliersPage() {
     const [filteredSuppliersData, setFilteredSuppliersData] = useState<Supplier[]>([])
     const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
 
+    // Get user role from localStorage
+    const user = JSON.parse(localStorage.getItem("user") || "{}")
+    const userRole = user?.role || ""
+
+    // Check permissions for different actions
+    const canAdd = userRole === "Admin" || userRole === "Manager" || userRole === "Agent"
+    const canEditDelete = userRole === "Admin" || userRole === "Manager"
+
+    // Get role color based on role type
+    const getRoleColor = (role: string) => {
+        switch (role.toLowerCase()) {
+            case 'admin':
+                return 'bg-red-500/20 text-red-400 border border-red-500/30'
+            case 'manager':
+                return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+            case 'agent':
+                return 'bg-green-500/20 text-green-400 border border-green-500/30'
+            default:
+                return 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+        }
+    }
+
+    // Debug logging for role checking
+    console.log("👤 Suppliers page - User role check:", { user, userRole, canAdd, canEditDelete })
+
     useEffect(() => {
         fetchSuppliers()
     }, [])
@@ -65,6 +90,15 @@ export default function SuppliersPage() {
     }
 
     const handleEdit = (id: number) => {
+        // Check permissions before allowing edit
+        if (!canEditDelete) {
+            toast.error("Access Denied", {
+                description: "You don't have permission to edit suppliers. Contact your administrator.",
+                duration: 5000,
+            })
+            return
+        }
+
         const supplier = suppliersData.find((s) => s.id === id)
         if (supplier) {
             setEditingSupplier(supplier)
@@ -76,6 +110,15 @@ export default function SuppliersPage() {
     }
 
     const handleDeleteClick = (id: number) => {
+        // Check permissions before allowing delete
+        if (!canEditDelete) {
+            toast.error("Access Denied", {
+                description: "You don't have permission to delete suppliers. Contact your administrator.",
+                duration: 5000,
+            })
+            return
+        }
+
         setSupplierToDelete(id)
         setAlertOpen(true)
     }
@@ -128,18 +171,43 @@ export default function SuppliersPage() {
         : "this supplier"
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="min-h-screen bg-zinc-950 text-white">
+            <Toaster
+                position="top-right"
+                toastOptions={{
+                    style: {
+                        background: '#18181b',
+                        border: '1px solid #3f3f46',
+                        color: '#ffffff',
+                    },
+                }}
+            />
+            <div className="p-6 space-y-6">
             <Toaster position="bottom-right" />
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-white">Supplier Management</h1>
                     <p className="text-zinc-400">Manage your suppliers</p>
+                    {!canAdd && (
+                        <p className="text-yellow-400 text-sm mt-1">
+                            ⚠️ View-only access - Contact admin for permissions
+                        </p>
+                    )}
+                    {canAdd && !canEditDelete && (
+                        <p className="text-yellow-400 text-sm mt-1">
+                                ⚠️ Limited access - Contact manager for delete/edit permissions
+                            </p>
+                    )}
                 </div>
-                <SupplierFormDialog
-                    onSupplierChange={fetchSuppliers}
-                    editingSupplier={editingSupplier}
-                    onEditComplete={handleEditComplete}
-                />
+
+                {/* Add Supplier button - for Admin, Manager, and Agent */}
+                {canAdd && (
+                    <SupplierFormDialog
+                        onSupplierChange={fetchSuppliers}
+                        editingSupplier={editingSupplier}
+                        onEditComplete={handleEditComplete}
+                    />
+                )}
             </div>
 
             {/* Delete Confirmation Alert Dialog */}
@@ -167,14 +235,32 @@ export default function SuppliersPage() {
             </AlertDialog>
 
             <Card className="bg-zinc-900 border-zinc-800 h-full">
-                <CardHeader>
-                    <CardTitle className="text-white">Suppliers</CardTitle>
-                    <input
-                        type="text"
-                        placeholder="Search suppliers..."
-                        className="mt-2 w-64 px-3 py-2 rounded-md bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-600"
-                        onChange={(e) => handleFilter(e.target.value)}
-                    />
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex flex-col">
+                        <CardTitle className="text-white">Suppliers</CardTitle>
+                        <div className="flex items-center gap-4 mt-1">
+                            <span className="text-sm text-zinc-400">
+                                {filteredSuppliersData.length > 0 ? filteredSuppliersData.length : suppliersData.length} {(filteredSuppliersData.length > 0 ? filteredSuppliersData.length : suppliersData.length) === 1 ? "supplier" : "suppliers"} found
+                            </span>
+                            {userRole && (
+                                <span className={`text-xs px-2 py-1 rounded-full ${getRoleColor(userRole)}`}>
+                                    {userRole || 'Unknown'} • {
+                                        canEditDelete
+                                            ? 'Full Access'
+                                            : canAdd
+                                            ? 'Add Only'
+                                            : 'View Only'
+                                    }
+                                </span>
+                            )}
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search suppliers..."
+                            className="mt-2 w-64 px-3 py-2 rounded-md bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-600"
+                            onChange={(e) => handleFilter(e.target.value)}
+                        />
+                    </div>
                 </CardHeader>
                 <CardContent className="max-h-[calc(100vh-16rem)] overflow-auto">
                     <div className="relative">
@@ -208,24 +294,38 @@ export default function SuppliersPage() {
                                             <TableCell className="text-white">{new Date(supplier.created_at).toLocaleDateString()}</TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-blue-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
-                                                        onClick={() => handleEdit(supplier.id)}
-                                                        title="Edit Supplier"
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                                        onClick={() => handleDeleteClick(supplier.id)}
-                                                        title="Delete Supplier"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    {/* Edit button - only for Admin and Manager */}
+                                                    {canEditDelete && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-blue-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                                                            onClick={() => handleEdit(supplier.id)}
+                                                            title="Edit Supplier"
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+
+                                                    {/* Delete button - only for Admin and Manager */}
+                                                    {canEditDelete && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                            onClick={() => handleDeleteClick(supplier.id)}
+                                                            title="Delete Supplier"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+
+                                                    {/* Show message for restricted users */}
+                                                    {!canEditDelete && (
+                                                        <span className="text-xs text-zinc-500 px-2 py-1">
+                                                            View Only
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -235,6 +335,7 @@ export default function SuppliersPage() {
                     </div>
                 </CardContent>
             </Card>
+            </div>
         </div>
     )
 }
