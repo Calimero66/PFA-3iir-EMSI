@@ -12,13 +12,27 @@ class UserController extends Controller
      */
     public function index()
     {
-        // $users = User::all();
         $authenticatedUser = auth()->user();
-        $users = User::where('id', '!=', $authenticatedUser->id)->get();
 
+        if (!$authenticatedUser) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User not authenticated'
+            ], 401);
+        }
+        // Start with base query excluding the authenticated user
+        $query = User::where('id', '!=', $authenticatedUser->id);
+
+        // If the authenticated user is a Manager, only show Managers and Agents
+        if ($authenticatedUser->role === 'Manager') {
+            $query->whereIn('role', ['Agent']);
+        }
+        $users = $query->get();
         return response()->json([
             'status' => 'success',
-            'data' => $users
+            'data' => $users,
+            'authenticated_user_role' => $authenticatedUser->role,
+            'total_users_returned' => $users->count()
         ]);
     }
 

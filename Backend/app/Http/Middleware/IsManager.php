@@ -15,9 +15,12 @@ class IsManager
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->user()?->role !== 'Admin' || $request->user()?->role !== 'Manager') {
-            return response()->json(['message' => 'Forbidden'], 403);
+        $userRole = $request->user()?->role;
+
+        if (!in_array($userRole, ['Admin', 'Manager'])) {
+            return response()->json(['message' => 'Forbidden. Admin or Manager role required.'], 403);
         }
+
         return $next($request);
     }
 }

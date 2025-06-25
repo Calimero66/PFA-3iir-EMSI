@@ -87,7 +87,8 @@ export default function CreateOrderDialog({
                                 <Label htmlFor="payment" className="mb-2 block text-white">
                                     Payment Status
                                 </Label>
-                                <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                                {/* if u want to use Select working with payment status, uncomment the Select component below */}
+                                {/* <Select value={paymentStatus} onValueChange={setPaymentStatus}>
                                     <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
                                         <SelectValue placeholder="Pending" />
                                     </SelectTrigger>
@@ -95,6 +96,18 @@ export default function CreateOrderDialog({
                                         <SelectItem value="Pending">Pending</SelectItem>
                                         <SelectItem value="Paid">Paid</SelectItem>
                                         <SelectItem value="Refunded">Refunded</SelectItem>
+                                    </SelectContent>
+                                </Select> */}
+                                <Select
+                                    value="Paid"
+                                    onValueChange={() => { }}
+                                    disabled
+                                >
+                                    <SelectTrigger className="w-full bg-zinc-800 border-zinc-700">
+                                        <SelectValue placeholder="Paid" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-zinc-800 border-zinc-700">
+                                        <SelectItem value="Paid">Paid</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

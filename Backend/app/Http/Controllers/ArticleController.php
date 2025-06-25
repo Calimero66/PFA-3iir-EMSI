@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Article;
 use App\Models\User;
 use App\Models\StockMovement;
+use App\Models\StockSupply;
 use App\Models\Report;
 use App\Services\StockService;
 use Illuminate\Http\Request;
@@ -80,6 +81,21 @@ class ArticleController extends Controller
             $existingArticle = Article::where('barcode', $validated['barcode'])->first();
 
             if ($existingArticle) {
+                // If the article exists but with a different name, return an error
+                if ($existingArticle->name !== $validated['name']) {
+                    return response()->json([
+                        'message' => 'An article with this barcode already exists with a different name',
+                        'existing_article' => [
+                            'id' => $existingArticle->id,
+                            'barcode' => $existingArticle->barcode,
+                            'name' => $existingArticle->name,
+                            'category_id' => $existingArticle->category_id
+                        ],
+                        'attempted_name' => $validated['name'],
+                        'error_details' => 'Articles with the same barcode must have the same name'
+                    ], 422);
+                }
+
                 // If the article exists but with a different category_id, return an error
                 if (isset($validated['category_id']) && $existingArticle->category_id != $validated['category_id']) {
                     return response()->json([
@@ -88,7 +104,7 @@ class ArticleController extends Controller
                     ], 422);
                 }
 
-                // If the article has the same barcode and same category, allow creating a new article
+                // If the article has the same barcode, same name, and same category, allow creating a new article
                 // Continue with the creation process
             }
 
@@ -166,19 +182,56 @@ class ArticleController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        // If barcode is being changed, check if it already exists with a different category
+        // If barcode is being changed, check if it already exists
         if (isset($validated['barcode']) && $validated['barcode'] !== $article->barcode) {
             $existingArticle = Article::where('barcode', $validated['barcode'])->first();
 
             if ($existingArticle) {
+                $newName = $validated['name'] ?? $article->name;
                 $newCategoryId = $validated['category_id'] ?? $article->category_id;
 
+                // Check if the name would be different
+                if ($existingArticle->name !== $newName) {
+                    return response()->json([
+                        'message' => 'An article with this barcode already exists with a different name',
+                        'existing_article' => [
+                            'id' => $existingArticle->id,
+                            'barcode' => $existingArticle->barcode,
+                            'name' => $existingArticle->name,
+                            'category_id' => $existingArticle->category_id
+                        ],
+                        'attempted_name' => $newName,
+                        'error_details' => 'Articles with the same barcode must have the same name'
+                    ], 422);
+                }
+
+                // Check if the category would be different
                 if ($existingArticle->category_id != $newCategoryId) {
                     return response()->json([
                         'message' => 'An article with this barcode already exists in a different category',
                         'existing_article' => $existingArticle
                     ], 422);
                 }
+            }
+        }
+
+        // If name is being changed, check if any other articles with the same barcode would have different names
+        if (isset($validated['name']) && $validated['name'] !== $article->name) {
+            $articlesWithSameBarcode = Article::where('barcode', $article->barcode)
+                ->where('id', '!=', $article->id)
+                ->first();
+
+            if ($articlesWithSameBarcode && $articlesWithSameBarcode->name !== $validated['name']) {
+                return response()->json([
+                    'message' => 'Cannot change name because other articles with the same barcode have a different name',
+                    'current_barcode' => $article->barcode,
+                    'existing_article_with_same_barcode' => [
+                        'id' => $articlesWithSameBarcode->id,
+                        'name' => $articlesWithSameBarcode->name
+                    ],
+                    'attempted_name' => $validated['name'],
+                    'error_details' => 'All articles with the same barcode must have the same name'
+                ], 422);
             }
         }
 
@@ -207,12 +260,72 @@ class ArticleController extends Controller
 
             return DB::transaction(function () use ($article) {
                 $deletedReports = [];
+                $updatedStockSupplies = [];
 
                 // Store article info before deletion
                 $articleId = $article->id;
                 $articleName = $article->name;
+                $articleBarcode = $article->barcode;
+                $articleQuantity = $article->quantity;
 
-                Log::info("Starting deletion of Article #{$articleId} - {$articleName}");
+                Log::info("Starting deletion of Article #{$articleId} - {$articleName} (Barcode: {$articleBarcode}, Quantity: {$articleQuantity})");
+
+                // Find all other articles with the same barcode (excluding the current article)
+                $articlesWithSameBarcode = Article::where('barcode', $articleBarcode)
+                    ->where('id', '!=', $articleId)
+                    ->get();
+
+                Log::info("Found " . count($articlesWithSameBarcode) . " other articles with barcode {$articleBarcode}");
+
+                // For each article with the same barcode, reduce stock supply quantities
+                foreach ($articlesWithSameBarcode as $otherArticle) {
+                    Log::info("Processing article #{$otherArticle->id} - {$otherArticle->name} with same barcode");
+
+                    // Get stock supplies for this article, ordered by supply_date (oldest first)
+                    $stockSupplies = StockSupply::where('article_id', $otherArticle->id)
+                        ->orderBy('supply_date', 'asc')
+                        ->get();
+
+                    $remainingQuantityToReduce = $articleQuantity;
+
+                    foreach ($stockSupplies as $stockSupply) {
+                        if ($remainingQuantityToReduce <= 0) {
+                            break;
+                        }
+
+                        $originalQuantity = $stockSupply->quantity;
+                        $reductionAmount = min($remainingQuantityToReduce, $originalQuantity);
+                        $newQuantity = $originalQuantity - $reductionAmount;
+
+                        // Update the stock supply quantity
+                        $stockSupply->quantity = $newQuantity;
+                        $stockSupply->save();
+
+                        $updatedStockSupplies[] = [
+                            'stock_supply_id' => $stockSupply->id,
+                            'article_id' => $otherArticle->id,
+                            'article_name' => $otherArticle->name,
+                            'original_quantity' => $originalQuantity,
+                            'reduction_amount' => $reductionAmount,
+                            'new_quantity' => $newQuantity
+                        ];
+
+                        $remainingQuantityToReduce -= $reductionAmount;
+
+                        Log::info("Updated stock supply #{$stockSupply->id}: {$originalQuantity} -> {$newQuantity} (reduced by {$reductionAmount})");
+
+                        // If stock supply quantity becomes 0, optionally delete it
+                        if ($newQuantity <= 0) {
+                            Log::info("Stock supply #{$stockSupply->id} quantity is now 0 or negative, keeping record but marking as depleted");
+                        }
+                    }
+
+                    // Update the article's total quantity
+                    $otherArticle->quantity = max(0, $otherArticle->quantity - ($articleQuantity - $remainingQuantityToReduce));
+                    $otherArticle->save();
+
+                    Log::info("Updated article #{$otherArticle->id} quantity to {$otherArticle->quantity}");
+                }
 
                 // Find all stock movements related to this article
                 $stockMovements = StockMovement::where('article_id', $article->id)->get();
@@ -232,15 +345,21 @@ class ArticleController extends Controller
                     }
                 }
 
-                // Delete the article (this will cascade delete stock movements due to foreign key constraints)
+                // Delete the article (this will cascade delete stock movements and stock supplies due to foreign key constraints)
                 $article->delete();
 
                 Log::info("Article #{$articleId} - {$articleName} deleted successfully");
 
                 $response = [
-                    'message' => 'Article deleted successfully',
+                    'message' => 'Article deleted successfully and quantities reduced from matching barcode stock supplies',
                     'deleted_article_id' => $articleId,
                     'deleted_article_name' => $articleName,
+                    'deleted_article_barcode' => $articleBarcode,
+                    'deleted_article_quantity' => $articleQuantity,
+                    'articles_with_same_barcode_count' => count($articlesWithSameBarcode),
+                    'updated_stock_supplies' => $updatedStockSupplies,
+                    'updated_stock_supplies_count' => count($updatedStockSupplies),
+                    'total_quantity_reduced_from_supplies' => collect($updatedStockSupplies)->sum('reduction_amount'),
                     'deleted_reports' => $deletedReports,
                     'deleted_reports_count' => count($deletedReports)
                 ];

@@ -50,9 +50,10 @@ interface ArticleDialogProps {
         supplier_id: string
         notes: string
     }
+    onDialogClose?: () => void
 }
 
-export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData }: ArticleDialogProps) {
+export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData, onDialogClose }: ArticleDialogProps) {
     // State for dialog
     const [open, setOpen] = useState(false)
     const [step, setStep] = useState(1)
@@ -100,10 +101,12 @@ export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData 
         }
     }, [open, allCategories.length, allSuppliers.length])
 
-    // Update form data when editing an item
+    // Update form data when editing an item and open dialog
     useEffect(() => {
         if (initialFormData && isEditing) {
             setFormData(initialFormData)
+            setOpen(true) // Open dialog when editing
+            setStep(1) // Start at step 1 for editing so user can modify barcode if needed
         }
     }, [initialFormData, isEditing])
 
@@ -262,9 +265,11 @@ export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData 
 
             resetForm()
             setOpen(false)
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error submitting form:", error)
-            setFormError("Failed to save article. Please try again.")
+            // Use the specific error message from the API if available
+            const errorMessage = error.message || "Failed to save article. Please try again."
+            setFormError(errorMessage)
         } finally {
             setIsSubmitting(false)
         }
@@ -304,11 +309,14 @@ export function ArticleDialog({ isEditing, editingId, onSubmit, initialFormData 
             </Button>
             
             {open && (
-                <Dialog 
+                <Dialog
                     open={open}
                     onOpenChange={(isOpen) => {
                         setOpen(isOpen)
-                        if (!isOpen) resetForm()
+                        if (!isOpen) {
+                            resetForm()
+                            onDialogClose?.() // Call the callback to reset editing state
+                        }
                     }}
                 >
                     <DialogContent className="sm:max-w-[550px] md:max-w-[600px] bg-zinc-900 border-zinc-800">

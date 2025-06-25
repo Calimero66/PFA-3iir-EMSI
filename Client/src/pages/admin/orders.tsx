@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { Calendar, Download } from "lucide-react"
+import { toast, Toaster } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -62,6 +63,30 @@ type NewOrderLine = {
 }
 
 export default function CommandesPage() {
+    // Get user role from localStorage
+    const user = JSON.parse(localStorage.getItem("user") || "{}")
+    const userRole = user?.role || ""
+
+    // Check if user has admin or manager permissions for delete operations
+    const canDelete = userRole === "Admin" || userRole === "Manager"
+
+    // Get role color based on role type
+    const getRoleColor = (role: string) => {
+        switch (role.toLowerCase()) {
+            case 'admin':
+                return 'bg-red-500/20 text-red-400 border border-red-500/30'
+            case 'manager':
+                return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+            case 'agent':
+                return 'bg-green-500/20 text-green-400 border border-green-500/30'
+            default:
+                return 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+        }
+    }
+
+    // Debug logging for role checking
+    console.log("👤 Orders page - User role check:", { user, userRole, canDelete })
+
     // State for orders
     const [orders, setOrders] = useState<Order[]>(initialOrders)
     const [date, setDate] = useState<Date | undefined>(undefined)
@@ -121,6 +146,15 @@ export default function CommandesPage() {
 
 
     const handleDeleteOrder = (order: Order) => {
+        // Check permissions before allowing delete
+        if (!canDelete) {
+            toast.error("Access Denied", {
+                description: "You don't have permission to delete orders. Contact your administrator.",
+                duration: 5000,
+            })
+            return
+        }
+
         setOrderToCancel(order)
         setCancelOrderDialogOpen(true)
     }
@@ -128,6 +162,15 @@ export default function CommandesPage() {
 
 
     const confirmCancelOrder = async () => {
+        // Double-check permissions before API call
+        if (!canDelete) {
+            toast.error("Access Denied", {
+                description: "You don't have permission to delete orders. Contact your administrator.",
+                duration: 5000,
+            })
+            return
+        }
+
         if (orderToCancel) {
             try {
                 console.log('Starting order deletion process for order:', orderToCancel.order_id)
@@ -214,6 +257,12 @@ export default function CommandesPage() {
                     console.log('⚠️ Some stock restoration failed - check logs above for details')
                 }
 
+                // Show success toast
+                toast.success("Order deleted successfully", {
+                    description: `Order #${orderToCancel.order_id} has been removed and stock restored`,
+                    duration: 3000,
+                })
+
             } catch (error: any) {
                 console.error('❌ Error in order deletion process:', error)
                 console.error('Error details:', {
@@ -221,7 +270,11 @@ export default function CommandesPage() {
                     response: error?.response?.data,
                     status: error?.response?.status
                 })
-                alert(`Failed to delete order. Error: ${error?.message || 'Unknown error'}. Check console for details.`)
+                // Show error toast
+                toast.error("Failed to delete order", {
+                    description: error?.message || "An unexpected error occurred while deleting the order",
+                    duration: 5000,
+                })
             }
         }
     }
@@ -294,11 +347,24 @@ export default function CommandesPage() {
                 // Reset form and close dialog
                 resetOrderForm()
                 setNewOrderDialogOpen(false)
+
+                // Show success toast
+                toast.success("Order created successfully", {
+                    description: `New order has been added with ${orderLines.length} item${orderLines.length !== 1 ? 's' : ''}`,
+                    duration: 3000,
+                })
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error creating order:", error)
-            // You might want to show an error message to the user here
-            alert("Failed to create order. Please try again.")
+
+            // Extract error message from API response
+            const errorMessage = error.response?.data?.message || error.message || "Failed to create order. Please try again."
+
+            // Show error toast
+            toast.error("Failed to create order", {
+                description: errorMessage,
+                duration: 5000,
+            })
         }
     }
 
@@ -310,12 +376,28 @@ export default function CommandesPage() {
     }
 
     return (
-        <div className="p-6 space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-white">Orders</h1>
-                    <p className="text-zinc-400">Manage customer orders</p>
-                </div>
+        <div className="min-h-screen bg-zinc-950 text-white">
+            <Toaster
+                position="top-right"
+                toastOptions={{
+                    style: {
+                        background: '#18181b',
+                        border: '1px solid #3f3f46',
+                        color: '#ffffff',
+                    },
+                }}
+            />
+            <div className="p-6 space-y-6">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white">Orders</h1>
+                        <p className="text-zinc-400">Manage customer orders</p>
+                        {!canDelete && (
+                            <p className="text-yellow-400 text-sm mt-1">
+                                ⚠️ Limited access - Contact admin for delete permissions
+                            </p>
+                        )}
+                    </div>
                 <CreateOrderDialog
                     open={newOrderDialogOpen}
                     onOpenChange={(open) => {
@@ -378,6 +460,9 @@ export default function CommandesPage() {
                 onDeleteOrder={handleDeleteOrder}
                 onExportOrder={handleExportOrder}
                 formatDate={formatDate}
+                canDelete={canDelete}
+                userRole={userRole}
+                getRoleColor={getRoleColor}
             />
 
             {/* Order Details Dialog */}
@@ -503,6 +588,7 @@ export default function CommandesPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            </div>
         </div>
     )
 }

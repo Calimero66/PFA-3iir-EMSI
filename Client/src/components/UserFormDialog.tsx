@@ -29,6 +29,10 @@ export default function UserFormDialog({ onUserChange, editingAgent, onEditCompl
     const [confirmPassword, setConfirmPassword] = useState("")
     const [role, setRole] = useState("")
 
+    // Get current user role
+    const currentUser = JSON.parse(localStorage.getItem("user") || "{}")
+    const currentUserRole = currentUser?.role || ""
+
     // Effect to handle editing agent changes
     useEffect(() => {
         if (editingAgent) {
@@ -101,13 +105,28 @@ export default function UserFormDialog({ onUserChange, editingAgent, onEditCompl
 
             console.log("Sending create data:", userData) // Debug log
 
-            const response = await api.post("/users", userData)
+            // Use different endpoint based on user role and target role
+            let endpoint = "/users"
+            if (currentUserRole === "Manager" && role === "Agent") {
+                endpoint = "/createAgent"
+                console.log("Manager creating Agent - using /createAgent endpoint")
+            }
+
+            const response = await api.post(endpoint, userData)
 
             if (response.status >= 200 && response.status < 300) {
                 onUserChange()
                 resetForm()
-                toast.success("Agent added successfully", {
-                    description: "The new agent has been added to your team",
+
+                const successMessage = currentUserRole === "Manager" && role === "Agent"
+                    ? "Agent created successfully"
+                    : "User added successfully"
+                const successDescription = currentUserRole === "Manager" && role === "Agent"
+                    ? "The new agent has been created and added to your team"
+                    : "The new user has been added to the system"
+
+                toast.success(successMessage, {
+                    description: successDescription,
                 })
             } else {
                 toast.error("Failed to create agent", {
@@ -349,15 +368,26 @@ export default function UserFormDialog({ onUserChange, editingAgent, onEditCompl
                             <option value="" disabled>
                                 Select a role
                             </option>
-                            <option value="Admin" className="text-white">
-                                Admin
-                            </option>
-                            <option value="Manager" className="text-white">
-                                Manager
-                            </option>
-                            <option value="Agent" className="text-white">
-                                Agent
-                            </option>
+                            {/* Admin can create all roles */}
+                            {currentUserRole === "Admin" && (
+                                <>
+                                    <option value="Admin" className="text-white">
+                                        Admin
+                                    </option>
+                                    <option value="Manager" className="text-white">
+                                        Manager
+                                    </option>
+                                    <option value="Agent" className="text-white">
+                                        Agent
+                                    </option>
+                                </>
+                            )}
+                            {/* Manager can only create Agents */}
+                            {currentUserRole === "Manager" && (
+                                <option value="Agent" className="text-white">
+                                    Agent
+                                </option>
+                            )}
                         </select>
                     </div>
                 </div>

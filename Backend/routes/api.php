@@ -33,11 +33,17 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::middleware(IsAdmin::class)->group(function () {
-        // Admin routes
-        Route::apiResource('users', UserController::class);
+        // Admin-only routes
+        Route::post('users', [UserController::class, 'store']);
+        Route::put('users/{id}', [UserController::class, 'update']);
+        Route::patch('users/{id}', [UserController::class, 'update']);
+        Route::delete('users/{id}', [UserController::class, 'destroy']);
+        Route::get('users/{id}', [UserController::class, 'show']);
     });
-    Route::middleware(IsManager::class)->group(function () {
 
+    Route::middleware(IsManager::class)->group(function () {
+        // Manager and Admin routes
+        Route::get('users', [UserController::class, 'index']); // Both Manager and Admin can list users
         Route::post('/createAgent', [UserController::class, 'CreateAgent']);
     });
 

@@ -17,6 +17,7 @@ import {
 import api from "@/lib/api"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import UserFormDialog from "@/components/UserFormDialog"
+import { useNavigate } from 'react-router-dom';
 
 type Agent = {
     id: number
@@ -32,8 +33,28 @@ export default function AgentsPage() {
     const [agentsData, setAgentsData] = useState<Agent[]>([])
     const [filteredAgentsData, setFilteredAgentsData] = useState<Agent[]>([])
     const [editingAgent, setEditingAgent] = useState<Agent | null>(null)
+    const user = JSON.parse(localStorage.getItem("user") || "{}")
+    const navigate = useNavigate();
+
+    // Get role color based on role type
+    const getRoleColor = (role: string) => {
+        switch (role.toLowerCase()) {
+            case 'admin':
+                return 'bg-red-500/20 text-red-400 border border-red-500/30'
+            case 'manager':
+                return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+            case 'agent':
+                return 'bg-green-500/20 text-green-400 border border-green-500/30'
+            default:
+                return 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+        }
+    }
 
     useEffect(() => {
+        if (user.role !== "Admin" && user.role !== "Manager") {
+            navigate('/dashboard' );
+            
+        }
         fetchUsers()
     }, [])
 
@@ -192,14 +213,7 @@ export default function AgentsPage() {
                                             </TableCell>
                                             <TableCell className="text-white">{agent.email}</TableCell>
                                             <TableCell className="text-white">
-                                                <span
-                                                    className={`px-2 py-1 rounded-md ${agent.role === "Admin"
-                                                            ? "bg-red-500/20 text-red-500"
-                                                            : agent.role === "Manager"
-                                                                ? "bg-blue-500/20 text-blue-500"
-                                                                : "bg-yellow-500/20 text-yellow-500"
-                                                        }`}
-                                                >
+                                                <span className={`px-2 py-1 rounded-md ${getRoleColor(agent.role)}`}>
                                                     {agent.role}
                                                 </span>
                                             </TableCell>
