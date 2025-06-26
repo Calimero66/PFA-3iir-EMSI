@@ -86,10 +86,10 @@ export function Sidebar() {
             roles: ["Admin", "Manager"],
 
         }, {
-            label: "Reports",
+            label: "Stock Movements",
             icon: BarChart,
-            to: "/reports",
-            active: pathname === "/reports",
+            to: "/stockmovements",
+            active: pathname === "/stockmovements",
             roles: ["Admin", "Manager", "Agent"],
 
         }, {

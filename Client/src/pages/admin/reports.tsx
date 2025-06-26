@@ -119,8 +119,8 @@ export default function ReportsPage() {
     return (
         <div className="p-6 space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">Reports</h1>
-                <p className="text-zinc-400">View and analyze transaction reports</p>
+                <h1 className="text-2xl font-bold text-white">Movements Stocks</h1>
+                <p className="text-zinc-400">View and analyze transaction Movements Stocks</p>
             </div>
 
             <div className="flex flex-wrap gap-4">
@@ -178,7 +178,7 @@ export default function ReportsPage() {
 
             {loading ? (
                 <div className="flex justify-center items-center h-64">
-                    <div className="text-zinc-400">Loading reports...</div>
+                    <div className="text-zinc-400">Loading Stocks...</div>
                 </div>
             ) : (
                 <TransactionReportsTable

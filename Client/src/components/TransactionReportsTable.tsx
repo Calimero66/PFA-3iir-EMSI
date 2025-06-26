@@ -1,6 +1,3 @@
-"use client"
-
-import { Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -31,7 +28,7 @@ export default function TransactionReportsTable({
     return (
         <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-                <CardTitle className="text-white">Transaction Reports</CardTitle>
+                <CardTitle className="text-white">Transaction Movements Stocks</CardTitle>
             </CardHeader>
             <CardContent>
                 <Table>
