@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { LayoutDashboard, LogOut, Package, Users, TrendingUp, BarChart, ShoppingCart, ListPlus, Warehouse } from "lucide-react"
+import { LayoutDashboard, LogOut, Package, Users, TrendingUp, BarChart, ShoppingCart, ListPlus, Warehouse, ArrowUpDown } from "lucide-react"
 import Cookies from "js-cookie"
 
 import { cn } from "@/lib/utils"
@@ -51,15 +51,15 @@ export function Sidebar() {
             // Even if API call fails, clear local storage and redirect
             localStorage.removeItem("user")
             localStorage.removeItem("token")
-            navigate("/login")
+            navigate("/")
         }
     }
     const routes = [
         {
             label: "Dashboard",
             icon: LayoutDashboard,
-            to: "/dashboard",
-            active: pathname === "/dashboard",
+            to: "/Dashboard",
+            active: pathname === "/Dashboard",
             roles: ["Admin", "Manager", "Agent"],
         },
         {
@@ -79,6 +79,14 @@ export function Sidebar() {
 
         },
         {
+            label: "Stock Movements",
+            icon: ArrowUpDown,
+            to: "/StockMovements",
+            active: pathname === "/StockMovements",
+            roles: ["Admin", "Manager", "Agent"],
+
+        },
+        {
             label: "Users",
             icon: Users,
             to: "/users",
@@ -86,10 +94,10 @@ export function Sidebar() {
             roles: ["Admin", "Manager"],
 
         }, {
-            label: "Stock Movements",
+            label: "Reports",
             icon: BarChart,
-            to: "/stockmovements",
-            active: pathname === "/stockmovements",
+            to: "/Reports",
+            active: pathname === "/Reports",
             roles: ["Admin", "Manager", "Agent"],
 
         }, {
@@ -124,7 +132,7 @@ export function Sidebar() {
     return (
         <div className="flex h-full w-64 flex-col bg-black text-white">
             <div className="flex h-14 items-center px-6">
-                <Link to="/dashboard" className="flex items-center gap-2">
+                <Link to="/Dashboard" className="flex items-center gap-2">
                     <TrendingUp className="h-6 w-6 text-purple-500" />
 
                     <span className="font-bold text-xl">STOCKIFY</span>

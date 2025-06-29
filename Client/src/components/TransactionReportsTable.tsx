@@ -28,7 +28,7 @@ export default function TransactionReportsTable({
     return (
         <Card className="bg-zinc-900 border-zinc-800">
             <CardHeader>
-                <CardTitle className="text-white">Transaction Movements Stocks</CardTitle>
+                <CardTitle className="text-white">Transaction reports</CardTitle>
             </CardHeader>
             <CardContent>
                 <Table>

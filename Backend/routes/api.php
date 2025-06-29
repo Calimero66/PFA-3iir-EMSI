@@ -11,6 +11,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderLineController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\StockSupplyController;
 use App\Http\Controllers\SupplierController;
 
@@ -20,6 +21,12 @@ Route::get("/", function (Request $request) {
         "message" => "Welcome to the API"
     ]);
 })->name("api.welcome");
+
+// Test Stock Movements without auth
+Route::get("/test-stock-movements", function (Request $request) {
+    $controller = new \App\Http\Controllers\StockMovementController();
+    return $controller->index();
+})->name("api.test-stock-movements");
 // Test
 
 
@@ -62,6 +69,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('stock/article/{articleId}/supplies', [StockSupplyController::class, 'getArticleSupplies']);
     Route::get('stock/article/{articleId}/movements', [StockSupplyController::class, 'getArticleMovements']);
 
+    // Stock Movement routes
+    Route::apiResource('stock-movements', StockMovementController::class);
+
     // Supplier routes
     Route::get('suppliers/with-counts', [SupplierController::class, 'getSuppliersWithCounts']);
     Route::get('suppliers/{supplier}/articles', [SupplierController::class, 'getArticles']);
@@ -92,6 +102,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('orders/lines', [OrderController::class, 'getOrderLines']);
     Route::get('orders/{orderId}/lines', [OrderController::class, 'getOrderLinesByOrder']);
     Route::get('orders/{orderId}/test-delete', [OrderController::class, 'testDelete']);
+    Route::get('orders/{orderId}/debug-stock-movements', [OrderController::class, 'debugStockMovements']);
     Route::delete('orders/multiple', [OrderController::class, 'destroyMultiple']);
     Route::post('orders/sell', [OrderController::class, 'sellArticle']);
     Route::apiResource('orders', OrderController::class);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Calendar, Filter } from "lucide-react"
+// import { Calendar, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -119,8 +119,8 @@ export default function ReportsPage() {
     return (
         <div className="p-6 space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-white">Movements Stocks</h1>
-                <p className="text-zinc-400">View and analyze transaction Movements Stocks</p>
+                <h1 className="text-2xl font-bold text-white">reports</h1>
+                <p className="text-zinc-400">View and analyze transaction reports</p>
             </div>
 
             <div className="flex flex-wrap gap-4">

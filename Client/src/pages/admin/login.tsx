@@ -45,7 +45,7 @@ const LoginPage = () => {
             localStorage.setItem("user", JSON.stringify(user))
 
             setTimeout(() => {
-                navigate("/dashboard")
+                navigate("/Dashboard")
             }, 500)
         } catch (err) {
             toast.error("Invalid email or password")

@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react"
-import { Trash2, PencilLine, Eye, Download } from "lucide-react"
+import { Trash2, PencilLine, Eye, Download, QrCode } from "lucide-react"
 import { toast, Toaster } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ArticleDialog } from "@/components/articles-dialog"
+import { QRCodeGenerator } from "@/components/qr-code-generator"
 import { exportArticleToPDF, exportArticleToHTML } from "@/utils/exportArticlePDF"
+import { generateArticlePDFQRData, generateArticleInfoQRData, getQRCodeTitle, getQRCodeDescription } from "@/utils/qrCodeUtils"
 import api from "@/lib/api"
 
 interface ArticleItem {
@@ -53,6 +55,9 @@ export default function ArticlesPage() {
     const [initialFormData, setInitialFormData] = useState<ArticleFormData | undefined>(undefined)
     const [viewDialogOpen, setViewDialogOpen] = useState(false)
     const [selectedArticle, setSelectedArticle] = useState<ArticleItem | null>(null)
+    const [qrDialogOpen, setQrDialogOpen] = useState(false)
+    const [qrArticle, setQrArticle] = useState<ArticleItem | null>(null)
+    const [qrDataType, setQrDataType] = useState<'pdf' | 'info'>('pdf')
 
     // Get user role from localStorage
     const user = JSON.parse(localStorage.getItem("user") || "{}")
@@ -246,6 +251,13 @@ export default function ArticlesPage() {
     const handleViewArticle = (item: ArticleItem) => {
         setSelectedArticle(item)
         setViewDialogOpen(true)
+    }
+
+    // Handle QR code generation
+    const handleGenerateQR = (article: ArticleItem, type: 'pdf' | 'info' = 'pdf') => {
+        setQrArticle(article)
+        setQrDataType(type)
+        setQrDialogOpen(true)
     }
 
     // Handle export with fallback options
@@ -448,6 +460,17 @@ export default function ArticlesPage() {
                                                         <Eye className="h-4 w-4" />
                                                     </Button>
 
+                                                    {/* QR Code button - always visible */}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-green-500 hover:text-green-400 hover:bg-green-500/10 transition-colors"
+                                                        onClick={() => handleGenerateQR(item, 'pdf')}
+                                                        title="Generate QR Code for PDF Download"
+                                                    >
+                                                        <QrCode className="h-4 w-4" />
+                                                    </Button>
+
                                                     {/* Edit button - only for Admin and Manager */}
                                                     {canEditDelete && (
                                                         <Button
@@ -550,8 +573,8 @@ export default function ArticlesPage() {
                                     </div>
                                 )}
 
-                                {/* Export Button */}
-                                <div className="flex justify-center pt-4 border-t border-zinc-800">
+                                {/* Export and QR Code Buttons */}
+                                <div className="flex justify-center gap-3 pt-4 border-t border-zinc-800">
                                     <Button
                                         variant="outline"
                                         className="bg-purple-600 hover:bg-purple-700 border-purple-600 text-white transition-colors"
@@ -559,6 +582,64 @@ export default function ArticlesPage() {
                                     >
                                         <Download className="h-4 w-4 mr-2" />
                                         Export Article Report
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="bg-green-600 hover:bg-green-700 border-green-600 text-white transition-colors"
+                                        onClick={() => handleGenerateQR(selectedArticle, 'pdf')}
+                                    >
+                                        <QrCode className="h-4 w-4 mr-2" />
+                                        Generate QR Code
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </DialogContent>
+                </Dialog>
+
+                {/* QR Code Dialog */}
+                <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+                    <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md">
+                        {qrArticle && (
+                            <div className="space-y-6">
+                                <DialogHeader>
+                                    <DialogTitle className="text-xl font-bold text-white">
+                                        {getQRCodeTitle(qrDataType === 'pdf' ? 'article-pdf' : 'article-info', qrArticle.name)}
+                                    </DialogTitle>
+                                    <p className="text-zinc-400">
+                                        {getQRCodeDescription(qrDataType === 'pdf' ? 'article-pdf' : 'article-info')}
+                                    </p>
+                                </DialogHeader>
+
+                                <QRCodeGenerator
+                                    data={qrDataType === 'pdf'
+                                        ? generateArticlePDFQRData(qrArticle)
+                                        : generateArticleInfoQRData(qrArticle)
+                                    }
+                                    size={250}
+                                    title=""
+                                    description=""
+                                    showDownload={true}
+                                    showCopy={true}
+                                    className="py-4"
+                                />
+
+                                <div className="flex justify-center gap-2 pt-4 border-t border-zinc-800">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setQrDataType(qrDataType === 'pdf' ? 'info' : 'pdf')}
+                                        className="bg-zinc-700 hover:bg-zinc-600 border-zinc-600 text-white transition-colors"
+                                    >
+                                        Switch to {qrDataType === 'pdf' ? 'Info' : 'PDF'} QR
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setQrDialogOpen(false)}
+                                        className="bg-purple-600 hover:bg-purple-700 border-purple-600 text-white transition-colors"
+                                    >
+                                        Close
                                     </Button>
                                 </div>
                             </div>

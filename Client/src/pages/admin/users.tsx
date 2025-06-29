@@ -52,8 +52,7 @@ export default function AgentsPage() {
 
     useEffect(() => {
         if (user.role !== "Admin" && user.role !== "Manager") {
-            navigate('/dashboard' );
-            
+            navigate('/Dashboard');
         }
         fetchUsers()
     }, [])

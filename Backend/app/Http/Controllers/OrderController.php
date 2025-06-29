@@ -226,6 +226,82 @@ class OrderController extends Controller
     }
 
     /**
+     * Debug endpoint to check stock movements and reports for an order
+     */
+    // public function debugStockMovements($orderId)
+    // {
+    //     $order = Order::with(['orderLines.article'])->find($orderId);
+
+    //     if (!$order) {
+    //         return response()->json(['message' => 'Order not found'], 404);
+    //     }
+
+    //     $debug_info = [];
+
+    //     // Get reports linked to order lines
+    //     $orderLineReports = Report::whereIn('order_line_id', $order->orderLines->pluck('id'))->get();
+
+    //     // Get reports linked to stock movements for this order's articles
+    //     $articleIds = $order->orderLines->pluck('article_id')->toArray();
+    //     $stockMovementReports = Report::whereHas('stockMovement', function($query) use ($articleIds, $order) {
+    //         $query->whereIn('article_id', $articleIds)
+    //               ->where('created_at', '>=', $order->created_at->subMinutes(5))
+    //               ->where('created_at', '<=', $order->created_at->addMinutes(5));
+    //     })->with('stockMovement')->get();
+
+    //     foreach ($order->orderLines as $orderLine) {
+    //         $allMovements = StockMovement::where('article_id', $orderLine->article_id)
+    //             ->orderBy('created_at', 'desc')
+    //             ->get();
+
+    //         $debug_info[] = [
+    //             'order_line_id' => $orderLine->id,
+    //             'article_id' => $orderLine->article_id,
+    //             'article_name' => $orderLine->article->name,
+    //             'order_quantity' => $orderLine->quantity,
+    //             'order_created_at' => $order->created_at,
+    //             'all_stock_movements' => $allMovements->map(function($movement) use ($order) {
+    //                 return [
+    //                     'id' => $movement->id,
+    //                     'type' => $movement->type,
+    //                     'quantity' => $movement->quantity,
+    //                     'created_at' => $movement->created_at,
+    //                     'reason' => $movement->reason,
+    //                     'time_diff_from_order' => $movement->created_at->diffInSeconds($order->created_at) . ' seconds'
+    //                 ];
+    //             })
+    //         ];
+    //     }
+
+    //     return response()->json([
+    //         'order_id' => $orderId,
+    //         'order_created_at' => $order->created_at,
+    //         'debug_info' => $debug_info,
+    //         'reports_linked_to_order_lines' => $orderLineReports->map(function($report) {
+    //             return [
+    //                 'id' => $report->id,
+    //                 'type' => $report->type,
+    //                 'order_line_id' => $report->order_line_id,
+    //                 'stock_movement_id' => $report->stock_movement_id,
+    //                 'details' => $report->details,
+    //                 'created_at' => $report->created_at
+    //             ];
+    //         }),
+    //         'reports_linked_to_stock_movements' => $stockMovementReports->map(function($report) {
+    //             return [
+    //                 'id' => $report->id,
+    //                 'type' => $report->type,
+    //                 'stock_movement_id' => $report->stock_movement_id,
+    //                 'stock_movement_article_id' => $report->stockMovement->article_id ?? null,
+    //                 'details' => $report->details,
+    //                 'created_at' => $report->created_at
+    //             ];
+    //         }),
+    //         'total_reports_found' => $orderLineReports->count() + $stockMovementReports->count()
+    //     ]);
+    // }
+
+    /**
      * Show the form for editing the specified resource.
      */
     public function edit(Order $order)
@@ -263,7 +339,8 @@ class OrderController extends Controller
 
                 Log::info("Starting deletion of Order #{$order->id}");
 
-                // Delete related reports for each order line
+                // Delete ALL related reports for this order
+                // 1. Delete reports linked to order lines
                 foreach ($orderWithLines->orderLines as $orderLine) {
                     $reports = Report::where('order_line_id', $orderLine->id)->get();
                     foreach ($reports as $report) {
@@ -271,10 +348,91 @@ class OrderController extends Controller
                             'report_id' => $report->id,
                             'order_line_id' => $orderLine->id,
                             'type' => $report->type,
-                            'details' => $report->details
+                            'details' => $report->details,
+                            'deletion_reason' => 'Linked to order line'
                         ];
                         $report->delete();
                         Log::info("Deleted report #{$report->id} for order line #{$orderLine->id}");
+                    }
+                }
+
+                // 2. Delete reports linked to stock movements for this order's articles
+                $articleIds = $orderWithLines->orderLines->pluck('article_id')->toArray();
+                $stockMovementReports = Report::whereHas('stockMovement', function($query) use ($articleIds, $orderWithLines) {
+                    $query->whereIn('article_id', $articleIds)
+                        ->where('type', 'out')
+                        ->where('created_at', '>=', $orderWithLines->created_at->subMinutes(5))
+                        ->where('created_at', '<=', $orderWithLines->created_at->addMinutes(5));
+                })->get();
+
+                foreach ($stockMovementReports as $report) {
+                    // Avoid deleting the same report twice
+                    if (!in_array($report->id, array_column($deletedReports, 'report_id'))) {
+                        $deletedReports[] = [
+                            'report_id' => $report->id,
+                            'stock_movement_id' => $report->stock_movement_id,
+                            'type' => $report->type,
+                            'details' => $report->details,
+                            'deletion_reason' => 'Linked to stock movement'
+                        ];
+                        $report->delete();
+                        Log::info("Deleted report #{$report->id} linked to stock movement #{$report->stock_movement_id}");
+                    }
+                }
+
+                // Find and delete stock movements related to this order
+                Log::info("Looking for stock movements to delete for order #{$orderWithLines->id}");
+
+                foreach ($orderWithLines->orderLines as $orderLine) {
+                    Log::info("Searching stock movements for article #{$orderLine->article_id}, quantity: {$orderLine->quantity}");
+
+                    // First, let's see all stock movements for this article
+                    $allMovements = StockMovement::where('article_id', $orderLine->article_id)
+                        ->where('type', 'out')
+                        ->orderBy('created_at', 'desc')
+                        ->get();
+
+                    Log::info("Found " . count($allMovements) . " 'out' movements for article #{$orderLine->article_id}");
+
+                    // Try to find movements with exact quantity match first
+                    $exactMatches = $allMovements->where('quantity', $orderLine->quantity);
+
+                    if ($exactMatches->isNotEmpty()) {
+                        // Find the one closest to order creation time
+                        $bestMatch = $exactMatches->sortBy(function($movement) use ($orderWithLines) {
+                            return abs($movement->created_at->diffInSeconds($orderWithLines->created_at));
+                        })->first();
+
+                        // First, delete any reports linked to this stock movement
+                        $reportsToDelete = Report::where('stock_movement_id', $bestMatch->id)->get();
+                        foreach ($reportsToDelete as $report) {
+                            Log::info("Deleting report #{$report->id} linked to stock movement #{$bestMatch->id}");
+                            $report->delete();
+                        }
+
+                        $deletedStockMovements[] = [
+                            'stock_movement_id' => $bestMatch->id,
+                            'article_id' => $bestMatch->article_id,
+                            'type' => $bestMatch->type,
+                            'quantity' => $bestMatch->quantity,
+                            'date' => $bestMatch->date,
+                            'reason' => $bestMatch->reason,
+                            'created_at' => $bestMatch->created_at,
+                            'order_created_at' => $orderWithLines->created_at,
+                            'time_diff_seconds' => $bestMatch->created_at->diffInSeconds($orderWithLines->created_at),
+                            'deleted_reports_count' => count($reportsToDelete)
+                        ];
+
+                        // Now delete the stock movement
+                        $bestMatch->delete();
+                        Log::info("Deleted stock movement #{$bestMatch->id} for article #{$bestMatch->article_id} (quantity: {$bestMatch->quantity}) and {$reportsToDelete->count()} related reports");
+                    } else {
+                        Log::warning("No matching stock movement found for article #{$orderLine->article_id} with quantity {$orderLine->quantity}");
+
+                        // Log all movements for debugging
+                        foreach ($allMovements as $movement) {
+                            Log::info("Available movement: ID #{$movement->id}, quantity: {$movement->quantity}, created: {$movement->created_at}");
+                        }
                     }
                 }
 
@@ -293,14 +451,7 @@ class OrderController extends Controller
                             $stockSupply->quantity += $orderLine->quantity;
                             $stockSupply->save();
 
-                            // Create a stock movement record for the restoration
-                            StockMovement::create([
-                                'article_id' => $article->id,
-                                'type' => 'in',
-                                'quantity' => $orderLine->quantity,
-                                'date' => now(),
-                                'reason' => "Order #{$order->id} deleted - stock restored for {$article->name}",
-                            ]);
+                            // Note: Original stock movement will be deleted, no new movement created
 
                             $restoredItems[] = [
                                 'article_name' => $article->name,
@@ -385,6 +536,7 @@ class OrderController extends Controller
                 $deletedOrders = [];
                 $restoredItems = [];
                 $deletedReports = [];
+                $deletedStockMovements = [];
 
                 foreach ($request->order_ids as $orderId) {
                     $order = Order::with(['orderLines.article'])->find($orderId);
@@ -393,7 +545,8 @@ class OrderController extends Controller
                         continue; // Skip if order not found
                     }
 
-                    // Delete related reports for each order line
+                    // Delete ALL related reports for this order
+                    // 1. Delete reports linked to order lines
                     foreach ($order->orderLines as $orderLine) {
                         $reports = Report::where('order_line_id', $orderLine->id)->get();
                         foreach ($reports as $report) {
@@ -402,10 +555,81 @@ class OrderController extends Controller
                                 'order_line_id' => $orderLine->id,
                                 'order_id' => $orderId,
                                 'type' => $report->type,
-                                'details' => $report->details
+                                'details' => $report->details,
+                                'deletion_reason' => 'Linked to order line'
                             ];
                             $report->delete();
                             Log::info("Deleted report #{$report->id} for order line #{$orderLine->id} in order #{$orderId}");
+                        }
+                    }
+
+                    // 2. Delete reports linked to stock movements for this order's articles
+                    $articleIds = $order->orderLines->pluck('article_id')->toArray();
+                    $stockMovementReports = Report::whereHas('stockMovement', function($query) use ($articleIds, $order) {
+                        $query->whereIn('article_id', $articleIds)
+                              ->where('type', 'out')
+                              ->where('created_at', '>=', $order->created_at->subMinutes(5))
+                              ->where('created_at', '<=', $order->created_at->addMinutes(5));
+                    })->get();
+
+                    foreach ($stockMovementReports as $report) {
+                        // Avoid deleting the same report twice
+                        if (!in_array($report->id, array_column($deletedReports, 'report_id'))) {
+                            $deletedReports[] = [
+                                'report_id' => $report->id,
+                                'stock_movement_id' => $report->stock_movement_id,
+                                'order_id' => $orderId,
+                                'type' => $report->type,
+                                'details' => $report->details,
+                                'deletion_reason' => 'Linked to stock movement'
+                            ];
+                            $report->delete();
+                            Log::info("Deleted report #{$report->id} linked to stock movement #{$report->stock_movement_id} in order #{$orderId}");
+                        }
+                    }
+
+                    // Find and delete stock movements related to this order
+                    Log::info("Looking for stock movements to delete for order #{$orderId}");
+
+                    foreach ($order->orderLines as $orderLine) {
+                        // Find all 'out' movements for this article
+                        $allMovements = StockMovement::where('article_id', $orderLine->article_id)
+                            ->where('type', 'out')
+                            ->orderBy('created_at', 'desc')
+                            ->get();
+
+                        // Try to find movements with exact quantity match
+                        $exactMatches = $allMovements->where('quantity', $orderLine->quantity);
+
+                        if ($exactMatches->isNotEmpty()) {
+                            // Find the one closest to order creation time
+                            $bestMatch = $exactMatches->sortBy(function($movement) use ($order) {
+                                return abs($movement->created_at->diffInSeconds($order->created_at));
+                            })->first();
+
+                            // First, delete any reports linked to this stock movement
+                            $reportsToDelete = Report::where('stock_movement_id', $bestMatch->id)->get();
+                            foreach ($reportsToDelete as $report) {
+                                Log::info("Deleting report #{$report->id} linked to stock movement #{$bestMatch->id} in order #{$orderId}");
+                                $report->delete();
+                            }
+
+                            $deletedStockMovements[] = [
+                                'stock_movement_id' => $bestMatch->id,
+                                'article_id' => $bestMatch->article_id,
+                                'order_id' => $orderId,
+                                'type' => $bestMatch->type,
+                                'quantity' => $bestMatch->quantity,
+                                'date' => $bestMatch->date,
+                                'reason' => $bestMatch->reason,
+                                'deleted_reports_count' => count($reportsToDelete)
+                            ];
+
+                            // Now delete the stock movement
+                            $bestMatch->delete();
+                            Log::info("Deleted stock movement #{$bestMatch->id} for article #{$bestMatch->article_id} in order #{$orderId} and {$reportsToDelete->count()} related reports");
+                        } else {
+                            Log::warning("No matching stock movement found for article #{$orderLine->article_id} with quantity {$orderLine->quantity} in order #{$orderId}");
                         }
                     }
 
@@ -421,14 +645,7 @@ class OrderController extends Controller
                             $stockSupply->quantity += $orderLine->quantity;
                             $stockSupply->save();
 
-                            // Create a stock movement record for the restoration
-                            StockMovement::create([
-                                'article_id' => $article->id,
-                                'type' => 'in',
-                                'quantity' => $orderLine->quantity,
-                                'date' => now(),
-                                'reason' => "Order #{$order->id} deleted - stock restored for {$article->name}",
-                            ]);
+                            // Note: Original stock movement will be deleted, no new movement created
 
                             $restoredItems[] = [
                                 'article_name' => $article->name,
@@ -447,7 +664,9 @@ class OrderController extends Controller
                     'deleted_orders' => $deletedOrders,
                     'restored_items' => $restoredItems,
                     'deleted_reports' => $deletedReports,
-                    'deleted_reports_count' => count($deletedReports)
+                    'deleted_reports_count' => count($deletedReports),
+                    'deleted_stock_movements' => $deletedStockMovements,
+                    'deleted_stock_movements_count' => count($deletedStockMovements)
                 ], 200);
             });
         } catch (\Exception $e) {
@@ -698,3 +917,4 @@ class OrderController extends Controller
     //     }
     // }
 }
+

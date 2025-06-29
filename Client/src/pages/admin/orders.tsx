@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react"
-import { Calendar, Download } from "lucide-react"
+import { Calendar, Download, QrCode } from "lucide-react"
 import { toast, Toaster } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { QRCodeDialog } from "@/components/qr-code-dialog"
 
 import api from "@/lib/api"
 import {
@@ -95,6 +96,8 @@ export default function CommandesPage() {
     const [newOrderDialogOpen, setNewOrderDialogOpen] = useState(false)
     const [cancelOrderDialogOpen, setCancelOrderDialogOpen] = useState(false)
     const [orderToCancel, setOrderToCancel] = useState<Order | null>(null)
+    const [qrDialogOpen, setQrDialogOpen] = useState(false)
+    const [qrOrder, setQrOrder] = useState<Order | null>(null)
 
     // State for new order form
     const [orderLines, setOrderLines] = useState<NewOrderLine[]>([{ article_id: 0, quantity: 1 }])
@@ -311,6 +314,12 @@ export default function CommandesPage() {
             console.error('PDF export failed, trying HTML export:', error)
             exportOrderToHTML(order)
         }
+    }
+
+    // Handle QR code generation
+    const handleGenerateQR = (order: Order) => {
+        setQrOrder(order)
+        setQrDialogOpen(true)
     }
 
     // Format price as string
@@ -556,6 +565,13 @@ export default function CommandesPage() {
                                     Close
                                 </Button>
                                 <Button
+                                    className="bg-green-600 hover:bg-green-700 transition-colors"
+                                    onClick={() => handleGenerateQR(selectedOrder)}
+                                >
+                                    <QrCode className="mr-2 h-4 w-4" />
+                                    Generate QR
+                                </Button>
+                                <Button
                                     className="bg-purple-600 hover:bg-purple-700 transition-colors"
                                     onClick={() => handleExportOrder(selectedOrder)}
                                 >
@@ -588,6 +604,15 @@ export default function CommandesPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* QR Code Dialog */}
+            <QRCodeDialog
+                open={qrDialogOpen}
+                onOpenChange={setQrDialogOpen}
+                item={qrOrder}
+                type="order"
+                defaultDataType="pdf"
+            />
             </div>
         </div>
     )
