@@ -195,7 +195,7 @@ export function QRCodeGenerator({
                             Download QR
                         </Button>
                     )}
-                    {showCopy && (
+                    {/* {showCopy && (
                         <Button
                             variant="outline"
                             size="sm"
@@ -206,7 +206,7 @@ export function QRCodeGenerator({
                             <Copy className="h-4 w-4 mr-2" />
                             Copy Data
                         </Button>
-                    )}
+                    )} */}
                     <Button
                         variant="outline"
                         size="sm"
